@@ -1,28 +1,59 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "patient.h"
 
-int exists(char name[], int phn) {
-    // Search Logic
+void patientInformationLookup();
+void doctorAppointment();
+void medicineInventory();
+void medicalReports();
+void emergencyPatientQueue();
+
+int main() {
+    int choice;
+
+    while (1) {
+        system("cls");  
+        printf("\nWelcome to SMRMS\n");
+        printf("1. Patient Information Lookup\n");
+        printf("2. Doctor Appointment\n");
+        printf("3. Medicine Inventory\n");
+        printf("4. Medical Reports\n");
+        printf("5. Emergency Patient Queue\n");
+        printf("6. Exit\n");
+        printf("Enter your choice: ");
+        
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n');
+            continue;
+        }
+
+        switch (choice) {
+            case 1:
+                patientInformationLookup();
+                break;
+            case 2:
+                doctorAppointment();
+                break;
+            case 3:
+                medicineInventory();
+                break;
+            case 4:
+                medicalReports();
+                break;
+            case 5:
+                emergencyPatientQueue();
+                break;
+            case 6:
+                printf("Exiting SMRMS... Goodbye!\n");
+                return 0;
+            default:
+                printf("Invalid choice. Please enter 1-6.\n");
+                printf("Press Enter to continue...");
+                getchar(); getchar();
+        }
+    }
+
     return 0;
-}
-
-void clearScreen() {
-    system("cls"); 
-}
-
-void show(int phn) {
-    printf("Details shown!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();  
-    
-}
-
-void makeEntry(char name[], int age, int phn) {
-    // Entry Logic
-    printf("Info added!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-    
 }
 
 void patientInformationLookup() {
@@ -82,52 +113,4 @@ void emergencyPatientQueue() {
     printf("\n[Emergency Patient Queue] - Coming Soon!\n");
     printf("Press Enter to return to menu...");
     getchar(); getchar();
-}
-
-int main() {
-    int choice;
-
-    while (1) {
-        clearScreen();  
-        printf("\nWelcome to SMRMS\n");
-        printf("1. Patient Information Lookup\n");
-        printf("2. Doctor Appointment\n");
-        printf("3. Medicine Inventory\n");
-        printf("4. Medical Reports\n");
-        printf("5. Emergency Patient Queue\n");
-        printf("6. Exit\n");
-        printf("Enter your choice: ");
-        
-        if (scanf("%d", &choice) != 1) {
-            while (getchar() != '\n');
-            continue;
-        }
-
-        switch (choice) {
-            case 1:
-                patientInformationLookup();
-                break;
-            case 2:
-                doctorAppointment();
-                break;
-            case 3:
-                medicineInventory();
-                break;
-            case 4:
-                medicalReports();
-                break;
-            case 5:
-                emergencyPatientQueue();
-                break;
-            case 6:
-                printf("Exiting SMRMS... Goodbye!\n");
-                return 0;
-            default:
-                printf("Invalid choice. Please enter 1-6.\n");
-                printf("Press Enter to continue...");
-                getchar(); getchar();
-        }
-    }
-
-    return 0;
 }

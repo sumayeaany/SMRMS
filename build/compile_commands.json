@@ -1,0 +1,14 @@
+[
+{
+  "directory": "C:/Users/hp/OneDrive/Desktop/SMRMS/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\gcc.exe  @CMakeFiles/smrms.dir/includes_C.rsp -g -std=gnu2x -o CMakeFiles\\smrms.dir\\src\\main.c.obj -c C:\\Users\\hp\\OneDrive\\Desktop\\SMRMS\\src\\main.c",
+  "file": "C:/Users/hp/OneDrive/Desktop/SMRMS/src/main.c",
+  "output": "CMakeFiles/smrms.dir/src/main.c.obj"
+},
+{
+  "directory": "C:/Users/hp/OneDrive/Desktop/SMRMS/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\gcc.exe  @CMakeFiles/smrms.dir/includes_C.rsp -g -std=gnu2x -o CMakeFiles\\smrms.dir\\src\\patient.c.obj -c C:\\Users\\hp\\OneDrive\\Desktop\\SMRMS\\src\\patient.c",
+  "file": "C:/Users/hp/OneDrive/Desktop/SMRMS/src/patient.c",
+  "output": "CMakeFiles/smrms.dir/src/patient.c.obj"
+}
+]
