@@ -24,8 +24,8 @@ Patient findPatient(int, const char*);
 void show(Patient*);
 void makeEntry(Patient*);
 void listAllPatients();
-void editPatient(char*);
-void deletePatient(char*);
+void editPatient(int, Patient);
+void deletePatient(int);
 void patientInformationLookup();
 
 #endif // PATIENT_H

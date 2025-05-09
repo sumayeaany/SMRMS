@@ -22,8 +22,6 @@ void initializeMaxPatientId() {
 
     char line[512];
 
-    // Skip header line
-    fgets(line, sizeof(line), fp);
 
     while (fgets(line, sizeof(line), fp)) {
         int id = atoi(strtok(line, ","));
@@ -44,7 +42,85 @@ int generatePatientId() {
     // Increment and return the next ID
     return ++maxPatientId;
 }
-// Generate a unique patient ID
+// Helper function to check if a string is effectively empty (only whitespace)
+static int isEffectivelyEmpty(const char* str) {
+    if (!str) return 1;
+    while (*str) {
+        if (!isspace((unsigned char)*str)) return 0;
+        str++;
+    }
+    return 1;
+}
+
+void stripNewline(char* str) {
+    size_t len = strlen(str);
+    while (len > 0 && (str[len-1] == '\n' || str[len-1] == '\r')) {
+        str[--len] = '\0';
+    }
+}
+
+static void getInput(const char* prompt, char* dest, size_t size) {
+    printf("%s", prompt);
+    fflush(stdout);
+    if (fgets(dest, (int)size, stdin)) {
+        dest[strcspn(dest, "\n")] = 0;
+    } else {
+        dest[0] = '\0';
+    }
+}
+
+// Helper: set "N/A" if input is empty (for optional fields)
+static void setOrNA(char* dest, const char* input, const size_t size) {
+    if (!isEffectivelyEmpty(input))
+        strncpy(dest, input, size - 1);
+    else
+        strncpy(dest, "N/A", size - 1);
+    dest[size - 1] = '\0';
+}
+// Robust CSV parser: fills missing fields with "N/A"
+void parseCsvLine(const char* line, Patient* patient) {
+    char lineCopy[512];
+    strncpy(lineCopy, line, sizeof(lineCopy) - 1);
+    lineCopy[sizeof(lineCopy) - 1] = '\0';
+    char* fields[11] = {0};
+    int field = 0;
+    char* p = lineCopy;
+    char* start = p;
+    while (*p && field < 11) {
+        if (*p == ',') {
+            *p = '\0';
+            fields[field++] = start;
+            start = p + 1;
+        }
+        p++;
+    }
+    if (field < 11) fields[field++] = start;
+    for (int i = 0; i < 11; i++) {
+        if (!fields[i] || isEffectivelyEmpty(fields[i])) fields[i] = "N/A";
+        else stripNewline(fields[i]);
+    }
+
+    stripNewline(patient->name);
+    stripNewline(patient->phone);
+    stripNewline(patient->address);
+    stripNewline(patient->email);
+    stripNewline(patient->bloodType);
+    stripNewline(patient->allergies);
+    stripNewline(patient->emergencyContact);
+    stripNewline(patient->primaryDoctor);
+
+    patient->patientId = atoi(fields[0]);
+    strncpy(patient->name, fields[1], sizeof(patient->name)-1);
+    patient->age = atoi(fields[2]);
+    patient->gender = fields[3][0];
+    strncpy(patient->phone, fields[4], sizeof(patient->phone)-1);
+    strncpy(patient->address, fields[5], sizeof(patient->address)-1);
+    strncpy(patient->email, fields[6], sizeof(patient->email)-1);
+    strncpy(patient->bloodType, fields[7], sizeof(patient->bloodType)-1);
+    strncpy(patient->allergies, fields[8], sizeof(patient->allergies)-1);
+    strncpy(patient->emergencyContact, fields[9], sizeof(patient->emergencyContact)-1);
+    strncpy(patient->primaryDoctor, fields[10], sizeof(patient->primaryDoctor)-1);
+}
 
 Patient findPatient(const int searchType, const char *searchValue) {
     FILE *fp = fopen(DATAFILE, "r");
@@ -61,23 +137,19 @@ Patient findPatient(const int searchType, const char *searchValue) {
         char lineCopy[512];
         strcpy(lineCopy, line);
 
+        // Extract just the fields needed for searching
         const char* tok_id = strtok(lineCopy, ",");
         const char* tok_name = strtok(NULL, ",");
-        const char* tok_age = strtok(NULL, ",");
-        const char* tok_gender = strtok(NULL, ",");
+        strtok(NULL, ","); // age
+        strtok(NULL, ","); // gender
         const char* tok_phone = strtok(NULL, ",");
-        const char* tok_address = strtok(NULL, ",");
-        const char* tok_email = strtok(NULL, ",");
-        const char* tok_blood = strtok(NULL, ",");
-        const char* tok_allergies = strtok(NULL, ",");
-        const char* tok_emergency = strtok(NULL, ",");
-        const char* tok_doctor = strtok(NULL, ",\n");
 
+        // Skip validation for search fields
         if (!tok_id || !tok_name || !tok_phone) continue;
 
         int id = atoi(tok_id);
 
-
+        // Keep the original search logic
         switch(searchType) {
             case 1: // Phone
                 if (strcmp(tok_phone, searchValue) == 0) {
@@ -110,42 +182,24 @@ Patient findPatient(const int searchType, const char *searchValue) {
         }
 
         if (found) {
-            patient.patientId = atoi(tok_id);
-            strcpy(patient.name, tok_name);
-            patient.age = atoi(tok_age);
-            patient.gender = tok_gender[0];
-            strcpy(patient.phone, tok_phone);
-
-            if (tok_address) strcpy(patient.address, tok_address);
-            if (tok_email) strcpy(patient.email, tok_email);
-            if (tok_blood) strcpy(patient.bloodType, tok_blood);
-            if (tok_allergies) strcpy(patient.allergies, tok_allergies);
-            if (tok_emergency) strcpy(patient.emergencyContact, tok_emergency);
-            if (tok_doctor) strcpy(patient.primaryDoctor, tok_doctor);
-
+            // Use the robust parser for the complete line
+            parseCsvLine(line, &patient);
             break; // Exit the loop once found
         }
     }
+
     fclose(fp);
     return patient;
 }
 
-// Helper function to check if a string is effectively empty (only whitespace)
-static int isEffectivelyEmpty(const char* str) {
-    if (!str) return 1;
-    while (*str) {
-        if (!isspace((unsigned char)*str)) return 0;
-        str++;
-    }
-    return 1;
-}
+
 
 void show(Patient* patient) {
     printf("\n==== Patient Information ====\n");
     printf("ID: %d\n", patient->patientId);
     printf("Name: %s\n", patient->name);
     printf("Age: %d\n", patient->age);
-    printf("Gender: %s\n", patient->gender == 'M' ? "Male" : "Female");
+    printf("Gender: %s\n", patient->gender == 'M' || patient->gender == 'm' ? "Male" : "Female");
     printf("Phone: %s\n", patient->phone);
     printf("Address: %s\n", !isEffectivelyEmpty(patient->address) ? patient->address : "N/A");
     printf("Email: %s\n", !isEffectivelyEmpty(patient->email) ? patient->email : "N/A");
@@ -159,7 +213,6 @@ void show(Patient* patient) {
 }
 
 void makeEntry(Patient *patient) {
-
     if (findPatient(3, patient->phone).patientId && findPatient(2, patient->name).patientId) {
         printf("A patient with this name or phone already exists.\n");
     } else {
@@ -168,11 +221,9 @@ void makeEntry(Patient *patient) {
             perror("Unable to open data file");
             return;
         }
-
         if (patient->patientId == 0) {
             patient->patientId = generatePatientId();
         }
-
         fprintf(fp, "%d,%s,%d,%c,%s,%s,%s,%s,%s,%s,%s\n",
                 patient->patientId,
                 patient->name,
@@ -210,22 +261,22 @@ void listAllPatients() {
         char lineCopy[512];
         strcpy(lineCopy, line);
 
-        char *tok_id = strtok(lineCopy, ",");
-        char *tok_name = strtok(NULL, ",");
-        char *tok_age = strtok(NULL, ",");
-        char *tok_gender = strtok(NULL, ","); // gender
-        char *tok_phn = strtok(NULL, ",");
+        const char *tok_id = strtok(lineCopy, ",");
+        const char *tok_name = strtok(NULL, ",");
+        const char *tok_age = strtok(NULL, ",");
+        const char *tok_gender = strtok(NULL, ","); // gender
+        const char *tok_phn = strtok(NULL, ",");
         strtok(NULL, ","); // address
         strtok(NULL, ","); // email
         strtok(NULL, ","); // blood
         strtok(NULL, ","); // allergies
         strtok(NULL, ","); // emergency
-        char *tok_doctor = strtok(NULL, ",\n");
+        const char *tok_doctor = strtok(NULL, "\r\n");
 
         if (!tok_id || !tok_name) continue;
 
         printf("%-8s %-12s %-5s %-10s %-15s %-12s\n",
-               tok_id, tok_name, tok_age, tok_gender[0] == 'M'? "Male" : "Female" , tok_phn,
+               tok_id, tok_name, tok_age, tok_gender[0] == 'M' || tok_gender[0] == 'm' ? "Male" : "Female" , tok_phn,
                tok_doctor ? tok_doctor : "N/A");
         count++;
     }
@@ -238,117 +289,190 @@ void listAllPatients() {
 }
 
 Patient makePatient(const char* name, const char* phone) {
-    Patient newPatient = {0}; // Initialize with zeros
+    Patient newPatient = {0};
     char buffer[256];
 
     printf("\n==== Add New Patient ====\n");
+    // Name (required)
     if (name) {
         printf("Name: %s\n", name);
-        strcpy(newPatient.name, name);
-    }
-    else {
-        printf("Name: ");
-        if (fgets(buffer, sizeof(buffer), stdin)) {
-            buffer[strcspn(buffer, "\n")] = 0;
-            if (strlen(buffer) > 0)
-                strncpy(newPatient.name, buffer, sizeof(newPatient.name) - 1);
-        }
-    }
-
-    // FIXED: Add an explicit prompt and wait for input
-    printf("Age: ");
-    fflush(stdout);  // Force the prompt to display
-
-    // Read input with careful handling
-    memset(buffer, 0, sizeof(buffer));
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            newPatient.age = atoi(buffer);
-        else
-            newPatient.age = 0;
+        strncpy(newPatient.name, name, sizeof(newPatient.name) - 1);
     } else {
-        newPatient.age = 0;
+        getInput("Name: ", buffer, sizeof(buffer));
+        setOrNA(newPatient.name, buffer, sizeof(newPatient.name));
     }
-
-    printf("Gender (M/F): ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            newPatient.gender = buffer[0];
-    }
-
+    // Age (required)
+    getInput("Age: ", buffer, sizeof(buffer));
+    newPatient.age = atoi(buffer);
+    // Gender (required)
+    getInput("Gender (M/F): ", buffer, sizeof(buffer));
+    newPatient.gender = toupper(buffer[0]);
+    // Phone (required)
     if (phone) {
         printf("Phone Number: %s\n", phone);
-        strcpy(newPatient.phone, phone);
+        strncpy(newPatient.phone, phone, sizeof(newPatient.phone) - 1);
+    } else {
+        getInput("Phone Number: ", buffer, sizeof(buffer));
+        setOrNA(newPatient.phone, buffer, sizeof(newPatient.phone));
     }
-    else {
-        printf("Phone Number: ");
-        if (fgets(buffer, sizeof(buffer), stdin)) {
-            buffer[strcspn(buffer, "\n")] = 0;
-            if (strlen(buffer) > 0)
-                strncpy(newPatient.phone, buffer, sizeof(newPatient.phone) - 1);
-        }
+    // Validate required fields
+    if (isEffectivelyEmpty(newPatient.name) || newPatient.gender == 0 || isEffectivelyEmpty(newPatient.phone) || !newPatient.age) {
+        printf("These fields cannot be empty. Please try again.\n");
+        printf("Press Enter to return to menu...");
+        getchar();
+        newPatient.patientId = -1;
+        return newPatient;
     }
-
-    printf("Address: ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            strncpy(newPatient.address, buffer, sizeof(newPatient.address) - 1);
-    }
-
-    printf("Email: ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            strncpy(newPatient.email, buffer, sizeof(newPatient.email) - 1);
-    }
-
-    printf("Blood Type: ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            strncpy(newPatient.bloodType, buffer, sizeof(newPatient.bloodType) - 1);
-    }
-
-    printf("Allergies: ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            strncpy(newPatient.allergies, buffer, sizeof(newPatient.allergies) - 1);
-    }
-
-    printf("Emergency Contact: ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            strncpy(newPatient.emergencyContact, buffer, sizeof(newPatient.emergencyContact) - 1);
-    }
-
-    printf("Primary Doctor: ");
-    if (fgets(buffer, sizeof(buffer), stdin)) {
-        buffer[strcspn(buffer, "\n")] = 0;
-        if (strlen(buffer) > 0)
-            strncpy(newPatient.primaryDoctor, buffer, sizeof(newPatient.primaryDoctor) - 1);
-    }
-
+    // Optional fields
+    getInput("Address: ", buffer, sizeof(buffer));
+    setOrNA(newPatient.address, buffer, sizeof(newPatient.address));
+    getInput("Email: ", buffer, sizeof(buffer));
+    setOrNA(newPatient.email, buffer, sizeof(newPatient.email));
+    getInput("Blood Type: ", buffer, sizeof(buffer));
+    setOrNA(newPatient.bloodType, buffer, sizeof(newPatient.bloodType));
+    getInput("Allergies: ", buffer, sizeof(buffer));
+    setOrNA(newPatient.allergies, buffer, sizeof(newPatient.allergies));
+    getInput("Emergency Contact: ", buffer, sizeof(buffer));
+    setOrNA(newPatient.emergencyContact, buffer, sizeof(newPatient.emergencyContact));
+    getInput("Primary Doctor: ", buffer, sizeof(buffer));
+    setOrNA(newPatient.primaryDoctor, buffer, sizeof(newPatient.primaryDoctor));
     return newPatient;
 }
 
-void editPatient(char phn[]) {
-    // Implementation to edit patient details
-    // This would involve reading all patients, modifying the target, and rewriting the file
-    printf("Edit functionality not yet implemented.\n");
+void editPatient(const int patientID, Patient patient) {
+    char id[5];
+    char prompt[256], input[256];
+
+    FILE *fp = fopen(DATAFILE, "r");
+    if (!fp) { perror("Unable to open data file"); return; }
+    FILE *temp = fopen("data/temp.csv", "w");
+    if (!temp) { perror("Unable to create temporary file"); fclose(fp); return; }
+    char line[512];
+    int found = 0;
+
+    printf("\n==== Editing Patient (ID: %d) ====\n", patient.patientId);
+    printf("For each field, press Enter to keep current value or enter new data\n\n");
+
+
+    snprintf(prompt, sizeof(prompt), "Name [%s]: ", patient.name);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.name, input, sizeof(patient.name));
+
+    snprintf(prompt, sizeof(prompt), "Age [%d]: ", patient.age);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) patient.age = atoi(input);
+
+    snprintf(prompt, sizeof(prompt), "Gender (M/F) [%c]: ", patient.gender);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) patient.gender = toupper(input[0]);
+
+    snprintf(prompt, sizeof(prompt), "Phone [%s]: ", patient.phone);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.phone, input, sizeof(patient.phone));
+
+    snprintf(prompt, sizeof(prompt), "Address [%s]: ", patient.address);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.address, input, sizeof(patient.address));
+
+    snprintf(prompt, sizeof(prompt), "Email [%s]: ", patient.email);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.email, input, sizeof(patient.email));
+
+    snprintf(prompt, sizeof(prompt), "Blood Type [%s]: ", patient.bloodType);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.bloodType, input, sizeof(patient.bloodType));
+
+    snprintf(prompt, sizeof(prompt), "Allergies [%s]: ", patient.allergies);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.allergies, input, sizeof(patient.allergies));
+
+    snprintf(prompt, sizeof(prompt), "Emergency Contact [%s]: ", patient.emergencyContact);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.emergencyContact, input, sizeof(patient.emergencyContact));
+
+    snprintf(prompt, sizeof(prompt), "Primary Doctor [%s]: ", patient.primaryDoctor);
+    getInput(prompt, input, sizeof(input));
+    if (!isEffectivelyEmpty(input)) setOrNA(patient.primaryDoctor, input, sizeof(patient.primaryDoctor));
+
+    while (fgets(line, sizeof(line), fp)) {
+        char lineCopy[512];
+        strcpy(lineCopy, line);
+        int currentId = atoi(strtok(lineCopy, ","));
+        if (currentId == patientID) {
+            found = 1;
+            fprintf(temp, "%d,%s,%d,%c,%s,%s,%s,%s,%s,%s,%s\n",
+                    patient.patientId,
+                    patient.name,
+                    patient.age,
+                    patient.gender,
+                    patient.phone,
+                    patient.address,
+                    patient.email,
+                    patient.bloodType,
+                    patient.allergies,
+                    patient.emergencyContact,
+                    patient.primaryDoctor);
+        } else {
+            fputs(line, temp);
+        }
+    }
+    fclose(fp);
+    fclose(temp);
+    if (found) {
+        remove(DATAFILE);
+        rename("data/temp.csv", DATAFILE);
+        printf("Patient record updated successfully.\n");
+    } else {
+        remove("data/temp.csv");
+        printf("Error updating patient.\n");
+    }
     printf("Press Enter to return to menu...");
-    getchar(); getchar();
+    getchar();
 }
 
-void deletePatient(char phn[]) {
-    // Implementation to delete a patient record
-    printf("Delete functionality not yet implemented.\n");
+
+void deletePatient(const int id) {
+    FILE *fp = fopen(DATAFILE, "r");
+    if (!fp) {
+        perror("Unable to open data file");
+        printf("Press Enter to return to menu...");
+        getchar();
+        return;
+    }
+    FILE *temp = fopen("data/temp.csv", "w");
+    if (!temp) {
+        perror("Unable to create temporary file");
+        fclose(fp);
+        printf("Press Enter to return to menu...");
+        getchar();
+        return;
+    }
+
+    char line[512];
+    int found = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        char lineCopy[512];
+        strcpy(lineCopy, line);
+        int currentId = atoi(strtok(lineCopy, ","));
+        if (currentId == id) {
+            found = 1; // Skip writing this line (delete)
+            continue;
+        }
+        fputs(line, temp);
+    }
+    fclose(fp);
+    fclose(temp);
+
+    if (found) {
+        remove(DATAFILE);
+        rename("data/temp.csv", DATAFILE);
+        printf("Patient record deleted successfully.\n");
+    } else {
+        remove("data/temp.csv");
+        printf("Patient with ID %d not found.\n", id);
+    }
     printf("Press Enter to return to menu...");
-    getchar(); getchar();
+    getchar();
 }
 
 void patientInformationLookup() {
@@ -398,7 +522,8 @@ void patientInformationLookup() {
                     if (c == 'y' || c == 'Y') {
                         while (getchar() != '\n'){}
                         Patient newPatient = makePatient(NULL, NULL);
-                        makeEntry(&newPatient);
+                        if (newPatient.patientId == 0)
+                            makeEntry(&newPatient);
                     }
                 }
                 break;
@@ -419,7 +544,8 @@ void patientInformationLookup() {
                     if (c == 'y' || c == 'Y') {
                         while (getchar() != '\n'){}
                         Patient newPatient = makePatient(name, NULL);
-                        makeEntry(&newPatient);
+                        if (newPatient.patientId == 0)
+                            makeEntry(&newPatient);
                     }
                 }
                 break;
@@ -440,7 +566,8 @@ void patientInformationLookup() {
                     if (c == 'y' || c == 'Y') {
                         while (getchar() != '\n'){}
                         Patient newPatient = makePatient(NULL, phone);
-                        makeEntry(&newPatient);
+                        if (newPatient.patientId == 0)
+                            makeEntry(&newPatient);
                     }
                 }
                 break;
@@ -453,16 +580,36 @@ void patientInformationLookup() {
                     break;
                 }
                 case 6: {
-                    char id[5];
+                    int id = 0;
                     printf("\nEnter ID of patient to edit: ");
-                    scanf("%s", id);
-                    editPatient(id);
+                    scanf("%d", &id);
+                    char pid[5];
+                    sprintf(pid, "%d", id);
+                    Patient exists = findPatient(3, pid);
+                    if (!exists.patientId) {
+                        printf("Patient with ID %s not found.\n", pid);
+                        printf("Press Enter to return to menu...");
+                        getchar();
+                        break;
+                    }
+                    while (getchar() != '\n'){}
+                    editPatient(id, exists);
                     break;
                 }
                 case 7: {
-                    char id[5];
+                    int id = 0;
                     printf("\nEnter ID of patient to delete: ");
-                    scanf("%s", id);
+                    scanf("%d", &id);
+                    char pid[5];
+                    sprintf(pid, "%d", id);
+                    Patient exists = findPatient(3, pid);
+                    if (!exists.patientId) {
+                        printf("Patient with ID %s not found.\n", pid);
+                        printf("Press Enter to return to menu...");
+                        getchar();
+                        break;
+                    }
+                    while (getchar() != '\n'){}
                     deletePatient(id);
                     break;
                 }
