@@ -16,6 +16,8 @@ set(SOURCES
         src/medicine.c
         include/report.h
         src/report.c
+        include/emergency.h
+        src/emergency.c
 )
 
 add_executable(smrms ${SOURCES})

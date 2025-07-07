@@ -4,9 +4,7 @@
 #include  "appointment.h"
 #include "medicine.h"
 #include "report.h"
-
-void medicalReports();
-void emergencyPatientQueue();
+#include "emergency.h"
 
 int main() {
     int choice;
@@ -62,8 +60,3 @@ int main() {
 }
 
 
-void emergencyPatientQueue(){
-    printf("\n[Emergency Patient Queue] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}

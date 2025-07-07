@@ -1,8 +1,10 @@
 build/
 CMakeFiles/
-data/
 CMakeCache.txt
 Makefile
 cmake_install.cmake
 *.exe
 .idea/
+.cmake/
+.github/
+cmake-build-debug/

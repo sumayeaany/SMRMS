@@ -1,522 +1,870 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <time.h>
-#include "report.h"
+    #include <stdlib.h>
+    #include <string.h>
+    #include <time.h>
+    #include "report.h"
+    #include "patient.h"
+    #include "medicine.h"
 
-#define REPORTS_DATAFILE "data/report.csv"
+    #define REPORT_DATAFILE "data/reports.csv"
+    #define PRESCRIPTION_DATAFILE "data/prescriptions.csv"
+    #define BILL_DATAFILE "data/bills.csv"
 
-static int maxReportId = 3000;
-static int isMaxReportIdInitialized = 0;
+    static int maxReportId = 3000;
+    static int maxPrescriptionId = 4000;
+    static int maxBillId = 5000;
 
-// Helper function to check if a string is effectively empty
-static int isReportEffectivelyEmpty(const char* str) {
-    if (!str) return 1;
-    while (*str) {
-        if (!isspace((unsigned char)*str)) return 0;
-        str++;
-    }
-    return 1;
-}
-
-// Helper function for input
-static void getReportInput(const char* prompt, char* dest, size_t size) {
-    printf("%s", prompt);
-    fflush(stdout);
-    if (fgets(dest, (int)size, stdin)) {
-        dest[strcspn(dest, "\n")] = 0;
-    } else {
-        dest[0] = '\0';
-    }
-}
-
-// Helper: set "N/A" if input is empty
-static void setReportOrNA(char* dest, const char* input, const size_t size) {
-    if (!isReportEffectivelyEmpty(input))
-        strncpy(dest, input, size - 1);
-    else
-        strncpy(dest, "N/A", size - 1);
-    dest[size - 1] = '\0';
-}
-
-// Helper: Get current date and time
-static void getCurrentDateTime(char* date, char* timeStr) {
-    time_t now;
-    time(&now);
-    struct tm* tm_info = localtime(&now);
-
-    strftime(date, 12, "%d/%m/%Y", tm_info);
-    strftime(timeStr, 9, "%H:%M:%S", tm_info);
-}
-
-void initializeMaxReportId() {
-    if (isMaxReportIdInitialized) return;
-
-    FILE *fp = fopen(REPORTS_DATAFILE, "r");
-    if (!fp) {
-        maxReportId = 3000;
-        isMaxReportIdInitialized = 1;
-        return;
+    // Helper functions
+    static void createDataDirectory() {
+        #ifdef _WIN32
+            system("if not exist data mkdir data");
+        #else
+            system("mkdir -p data");
+        #endif
     }
 
-    Report report;
-    maxReportId = 3000;
-    while (fscanf(fp, "%d,%29[^,],%11[^,],%9[^,],%199[^\n]",
-                  &report.reportId, report.reportType, report.generatedDate,
-                  report.generatedTime, report.description) == 5) {
-        if (report.reportId > maxReportId) {
-            maxReportId = report.reportId;
-        }
+    int generateReportId() {
+        return ++maxReportId;
     }
-    fclose(fp);
-    isMaxReportIdInitialized = 1;
-}
 
-int generateReportId() {
-    if (!isMaxReportIdInitialized) {
-        initializeMaxReportId();
+    int generatePrescriptionId() {
+        return ++maxPrescriptionId;
     }
-    return ++maxReportId;
-}
 
-void makeReportEntry(Report* report) {
-    // Create data directory if it doesn't exist
-    #ifdef _WIN32
-        system("if not exist data mkdir data");
-    #else
-        system("mkdir -p data");
-    #endif
+    int generateBillId() {
+        return ++maxBillId;
+    }
 
-    FILE *fp = fopen(REPORTS_DATAFILE, "a");
-    if (!fp) {
-        fp = fopen(REPORTS_DATAFILE, "w");
+    void saveReport(Report* report) {
+        createDataDirectory();
+
+        FILE *fp = fopen(REPORT_DATAFILE, "a");
         if (!fp) {
-            perror("Unable to create reports data file");
+            printf("Error saving report.\n");
+            return;
+        }
+
+        time_t now;
+        time(&now);
+        const struct tm *timeinfo = localtime(&now);
+        strftime(report->generatedDate, sizeof(report->generatedDate), "%d/%m/%Y", timeinfo);
+
+        fprintf(fp, "%d,%d,%s,%s,%s\n",
+                report->reportId, report->type, report->generatedDate,
+                report->title, report->content);
+
+        fclose(fp);
+    }
+
+    void savePrescription(Prescription* prescription) {
+        createDataDirectory();
+
+        FILE *fp = fopen(PRESCRIPTION_DATAFILE, "a");
+        if (!fp) {
+            printf("Error saving prescription.\n");
+            return;
+        }
+
+        fprintf(fp, "%d,%d,%d,%s,%d,%.2f,%.2f,%s,%s,%s,%s,%s\n",
+                prescription->prescriptionId, prescription->patientId, prescription->medicineId,
+                prescription->medicineName, prescription->quantity, prescription->unitPrice,
+                prescription->totalPrice, prescription->prescribedDate, prescription->prescribedBy,
+                prescription->dosage, prescription->duration, prescription->notes);
+
+        fclose(fp);
+    }
+
+    void saveBill(Bill* bill) {
+        createDataDirectory();
+
+        FILE *fp = fopen(BILL_DATAFILE, "a");
+        if (!fp) {
+            printf("Error saving bill.\n");
+            return;
+        }
+
+        fprintf(fp, "%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%s,%s,%s\n",
+                bill->billId, bill->patientId, bill->consultationFee, bill->medicineTotal,
+                bill->tax, bill->discount, bill->grandTotal, bill->billDate,
+                bill->paymentStatus, bill->notes);
+
+        fclose(fp);
+    }
+
+    void generatePatientProfileReport() {
+        int patientId;
+        printf("Enter Patient ID: ");
+        scanf("%d", &patientId);
+        getchar();
+
+        char patientIdStr[10];
+        sprintf(patientIdStr, "%d", patientId);
+        Patient patient = findPatient(3, patientIdStr);
+
+        if (patient.patientId == 0) {
+            printf("Patient not found!\n");
             printf("Press Enter to return to menu...");
             getchar();
             return;
         }
-        fclose(fp);
-        fp = fopen(REPORTS_DATAFILE, "a");
-    }
 
-    if (report->reportId == 0) {
-        report->reportId = generateReportId();
-    }
+        Report report = {0};
+        report.reportId = generateReportId();
+        report.type = PATIENT_PROFILE;
+        sprintf(report.title, "Patient Profile - %s (ID: %d)", patient.name, patient.patientId);
 
-    fprintf(fp, "%d,%s,%s,%s,%s\n",
-            report->reportId, report->reportType, report->generatedDate,
-            report->generatedTime, report->description);
+        char content[2000];
+        sprintf(content,
+                "==== PATIENT PROFILE REPORT ====\n\n"
+                "Patient ID: %d\n"
+                "Name: %s\n"
+                "Age: %d\n"
+                "Gender: %s\n"
+                "Phone: %s\n"
+                "Address: %s\n"
+                "Email: %s\n"
+                "Blood Type: %s\n"
+                "Allergies: %s\n"
+                "Emergency Contact: %s\n"
+                "Primary Doctor: %s\n\n"
+                "Report generated on: %s\n",
+                patient.patientId, patient.name, patient.age,
+                patient.gender == 'M' ? "Male" : "Female",
+                patient.phone, patient.address, patient.email,
+                patient.bloodType, patient.allergies,
+                patient.emergencyContact, patient.primaryDoctor,
+                report.generatedDate);
 
-    fclose(fp);
-    printf("Report generated successfully with ID: %d\n", report->reportId);
-}
+        strcpy(report.content, content);
+        saveReport(&report);
 
-Report makeReport() {
-    Report report = {0};
-    char buffer[256];
-
-    printf("\n==== Generate New Report ====\n");
-
-    // Report type
-    getReportInput("Report type: ", buffer, sizeof(buffer));
-    setReportOrNA(report.reportType, buffer, sizeof(report.reportType));
-
-    // Description
-    getReportInput("Description: ", buffer, sizeof(buffer));
-    setReportOrNA(report.description, buffer, sizeof(report.description));
-
-    // Auto-generate date and time
-    getCurrentDateTime(report.generatedDate, report.generatedTime);
-
-    return report;
-}
-
-Report findReport(const int reportId) {
-    Report report = {0};
-    FILE *fp = fopen(REPORTS_DATAFILE, "r");
-    if (!fp) {
-        printf("Unable to open reports data file\n");
-        return report;
-    }
-
-    while (fscanf(fp, "%d,%29[^,],%11[^,],%9[^,],%199[^\n]",
-                  &report.reportId, report.reportType, report.generatedDate,
-                  report.generatedTime, report.description) == 5) {
-        if (report.reportId == reportId) {
-            fclose(fp);
-            return report;
-        }
-    }
-    fclose(fp);
-    report.reportId = 0; // Not found
-    return report;
-}
-
-void showReport(Report* report) {
-    printf("\n==== Report Details ====\n");
-    printf("Report ID: %d\n", report->reportId);
-    printf("Type: %s\n", report->reportType);
-    printf("Generated Date: %s\n", report->generatedDate);
-    printf("Generated Time: %s\n", report->generatedTime);
-    printf("Description: %s\n", report->description);
-    printf("=========================\n");
-}
-
-void listAllReports() {
-    FILE *fp = fopen(REPORTS_DATAFILE, "r");
-    if (!fp) {
-        printf("No reports data file found or unable to open file.\n");
+        printf("\n%s", content);
+        printf("\nReport saved with ID: %d\n", report.reportId);
         printf("Press Enter to return to menu...");
         getchar();
-        return;
     }
 
-    Report report;
-    printf("\n==== All Reports ====\n");
-    printf("%-6s %-20s %-12s %-10s %-30s\n", "ID", "Type", "Date", "Time", "Description");
-    printf("--------------------------------------------------------------------------------\n");
-
-    while (fscanf(fp, "%d,%29[^,],%11[^,],%9[^,],%199[^\n]",
-                  &report.reportId, report.reportType, report.generatedDate,
-                  report.generatedTime, report.description) == 5) {
-        printf("%-6d %-20s %-12s %-10s %-30s\n",
-               report.reportId, report.reportType, report.generatedDate,
-               report.generatedTime, report.description);
-    }
-    fclose(fp);
-    printf("\nPress Enter to return to menu...");
-    getchar();
-}
-
-void deleteReport(const int reportId) {
-    Report report = findReport(reportId);
-    if (report.reportId == 0) {
-        printf("Report with ID %d not found.\n", reportId);
-        printf("Press Enter to return to menu...");
+    void generateAppointmentHistoryReport() {
+        int patientId;
+        printf("Enter Patient ID: ");
+        scanf("%d", &patientId);
         getchar();
-        return;
-    }
 
-    showReport(&report);
-    printf("\nAre you sure you want to delete this report? (y/n): ");
-    char confirm;
-    scanf("%c", &confirm);
-    getchar();
+        Report report = {0};
+        report.reportId = generateReportId();
+        report.type = APPOINTMENT_HISTORY;
+        sprintf(report.title, "Appointment History - Patient ID: %d", patientId);
 
-    if (confirm != 'y' && confirm != 'Y') {
-        printf("Delete operation cancelled.\n");
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
+        char content[2000] = "==== APPOINTMENT HISTORY REPORT ====\n\n";
+        char line[200];
 
-    FILE *fp = fopen(REPORTS_DATAFILE, "r");
-    FILE *temp = fopen("data/temp_reports.csv", "w");
+        FILE *fp = fopen("data/appointment.csv", "r");
+        if (!fp) {
+            strcat(content, "No appointment data found.\n");
+        } else {
+            int appointmentCount = 0;
+            char buffer[512];
 
-    if (!fp || !temp) {
-        printf("Error accessing files.\n");
-        if (fp) fclose(fp);
-        if (temp) fclose(temp);
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
+            while (fgets(buffer, sizeof(buffer), fp)) {
+                int apptId, patId;
+                char doctor[50], date[20], time[10], purpose[100], status[20];
 
-    Report currentReport;
-    while (fscanf(fp, "%d,%29[^,],%11[^,],%9[^,],%199[^\n]",
-                  &currentReport.reportId, currentReport.reportType, currentReport.generatedDate,
-                  currentReport.generatedTime, currentReport.description) == 5) {
+                if (sscanf(buffer, "%d,%d,%49[^,],%19[^,],%9[^,],%99[^,],%19[^\n]",
+                          &apptId, &patId, doctor, date, time, purpose, status) == 7) {
 
-        if (currentReport.reportId != reportId) {
-            fprintf(temp, "%d,%s,%s,%s,%s\n",
-                    currentReport.reportId, currentReport.reportType, currentReport.generatedDate,
-                    currentReport.generatedTime, currentReport.description);
-        }
-    }
-
-    fclose(fp);
-    fclose(temp);
-
-    remove(REPORTS_DATAFILE);
-    rename("data/temp_reports.csv", REPORTS_DATAFILE);
-
-    printf("Report deleted successfully.\n");
-    printf("Press Enter to return to menu...");
-    getchar();
-}
-
-void generatePatientProfileReport() {
-    int patientId;
-    printf("Enter Patient ID for profile report: ");
-    scanf("%d", &patientId);
-    getchar();
-
-    char patientIdStr[10];
-    sprintf(patientIdStr, "%d", patientId);
-    Patient patient = findPatient(3, patientIdStr);
-
-    if (patient.patientId == 0) {
-        printf("Patient with ID %d not found.\n", patientId);
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
-
-    printf("\n==== Patient Profile Report ====\n");
-    showPatient(&patient);
-
-    Report report;
-    sprintf(report.reportType, "Patient Profile");
-    sprintf(report.description, "Profile report for Patient ID: %d (%s)", patient.patientId, patient.name);
-    getCurrentDateTime(report.generatedDate, report.generatedTime);
-    makeReportEntry(&report);
-
-    printf("Press Enter to return to menu...");
-    getchar();
-}
-
-void generatePatientAppointmentHistory() {
-    int patientId;
-    printf("Enter Patient ID for appointment history: ");
-    scanf("%d", &patientId);
-    getchar();
-
-    char patientIdStr[10];
-    sprintf(patientIdStr, "%d", patientId);
-    Patient patient = findPatient(3, patientIdStr);
-
-    if (patient.patientId == 0) {
-        printf("Patient with ID %d not found.\n", patientId);
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
-
-    printf("\n==== Patient Appointment History ====\n");
-    printf("Patient: %s (ID: %d)\n\n", patient.name, patient.patientId);
-
-    FILE *fp = fopen("data/appointment.csv", "r");
-    if (!fp) {
-        printf("No appointment data found.\n");
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
-
-    char line[512];
-    int found = 0;
-    printf("%-8s %-15s %-12s %-8s %-15s %-12s\n",
-           "App ID", "Doctor", "Date", "Time", "Purpose", "Status");
-    printf("------------------------------------------------------------------------\n");
-
-    while (fgets(line, sizeof(line), fp)) {
-        char lineCopy[512];
-        strcpy(lineCopy, line);
-
-        const char *tok_id = strtok(lineCopy, ",");
-        const char *tok_patientId = strtok(NULL, ",");
-
-        if (tok_patientId && atoi(tok_patientId) == patientId) {
-            strcpy(lineCopy, line);
-            const char *tok_id2 = strtok(lineCopy, ",");
-            const char *tok_patientId2 = strtok(NULL, ",");
-            const char *tok_doctor = strtok(NULL, ",");
-            const char *tok_date = strtok(NULL, ",");
-            const char *tok_time = strtok(NULL, ",");
-            const char *tok_purpose = strtok(NULL, ",");
-            const char *tok_status = strtok(NULL, "\r\n");
-
-            printf("%-8s %-15s %-12s %-8s %-15s %-12s\n",
-                   tok_id2 ? tok_id2 : "N/A",
-                   tok_doctor ? tok_doctor : "N/A",
-                   tok_date ? tok_date : "N/A",
-                   tok_time ? tok_time : "N/A",
-                   tok_purpose ? tok_purpose : "N/A",
-                   tok_status ? tok_status : "N/A");
-            found = 1;
-        }
-    }
-
-    if (!found) {
-        printf("No appointments found for this patient.\n");
-    }
-
-    fclose(fp);
-
-    Report report;
-    sprintf(report.reportType, "Appointment History");
-    sprintf(report.description, "Appointment history for Patient ID: %d (%s)", patient.patientId, patient.name);
-    getCurrentDateTime(report.generatedDate, report.generatedTime);
-    makeReportEntry(&report);
-
-    printf("\nPress Enter to return to menu...");
-    getchar();
-}
-
-void generateDailyPatientReport() {
-    char date[12];
-    printf("Enter date (DD/MM/YYYY) for daily patient report: ");
-    scanf("%s", date);
-    getchar();
-
-    printf("\n==== Daily Patient Report for %s ====\n", date);
-
-    FILE *fp = fopen("data/appointment.csv", "r");
-    if (!fp) {
-        printf("No appointment data found.\n");
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
-
-    char line[512];
-    int count = 0;
-    printf("%-8s %-10s %-15s %-8s %-15s\n", "App ID", "Patient ID", "Doctor", "Time", "Purpose");
-    printf("----------------------------------------------------------\n");
-
-    while (fgets(line, sizeof(line), fp)) {
-        char lineCopy[512];
-        strcpy(lineCopy, line);
-
-        const char *tok_id = strtok(lineCopy, ",");
-        const char *tok_patientId = strtok(NULL, ",");
-        const char *tok_doctor = strtok(NULL, ",");
-        const char *tok_date = strtok(NULL, ",");
-        const char *tok_time = strtok(NULL, ",");
-        const char *tok_purpose = strtok(NULL, ",");
-
-        if (tok_date && strcmp(tok_date, date) == 0) {
-            printf("%-8s %-10s %-15s %-8s %-15s\n",
-                   tok_id ? tok_id : "N/A",
-                   tok_patientId ? tok_patientId : "N/A",
-                   tok_doctor ? tok_doctor : "N/A",
-                   tok_time ? tok_time : "N/A",
-                   tok_purpose ? tok_purpose : "N/A");
-            count++;
-        }
-    }
-
-    printf("\nTotal appointments for %s: %d\n", date, count);
-    fclose(fp);
-
-    Report report;
-    sprintf(report.reportType, "Daily Patient Report");
-    sprintf(report.description, "Daily patient appointments for %s (%d total)", date, count);
-    getCurrentDateTime(report.generatedDate, report.generatedTime);
-    makeReportEntry(&report);
-
-    printf("Press Enter to return to menu...");
-    getchar();
-}
-
-void generatePatientStatisticsReport() {
-    printf("\n==== Patient Statistics Report ====\n");
-
-    FILE *fp = fopen("data/patient.csv", "r");
-    if (!fp) {
-        printf("No patient data found.\n");
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
-    }
-
-    Patient patient;
-    int totalPatients = 0, maleCount = 0, femaleCount = 0;
-    int ageGroups[5] = {0}; // 0-18, 19-30, 31-50, 51-70, 71+
-
-    while (fscanf(fp, "%d,%49[^,],%d,%c,%14[^,],%99[^,],%49[^,],%4[^,],%199[^,],%14[^,],%49[^\n]",
-                  &patient.patientId, patient.name, &patient.age, &patient.gender,
-                  patient.phone, patient.address, patient.email, patient.bloodType,
-                  patient.allergies, patient.emergencyContact, patient.primaryDoctor) >= 5) {
-        totalPatients++;
-
-        if (patient.gender == 'M') maleCount++;
-        else if (patient.gender == 'F') femaleCount++;
-
-        if (patient.age <= 18) ageGroups[0]++;
-        else if (patient.age <= 30) ageGroups[1]++;
-        else if (patient.age <= 50) ageGroups[2]++;
-        else if (patient.age <= 70) ageGroups[3]++;
-        else ageGroups[4]++;
-    }
-
-    printf("Total Patients: %d\n", totalPatients);
-    printf("Male Patients: %d (%.1f%%)\n", maleCount, totalPatients > 0 ? (float)maleCount/totalPatients*100 : 0);
-    printf("Female Patients: %d (%.1f%%)\n", femaleCount, totalPatients > 0 ? (float)femaleCount/totalPatients*100 : 0);
-    printf("\nAge Group Distribution:\n");
-    printf("0-18 years: %d patients\n", ageGroups[0]);
-    printf("19-30 years: %d patients\n", ageGroups[1]);
-    printf("31-50 years: %d patients\n", ageGroups[2]);
-    printf("51-70 years: %d patients\n", ageGroups[3]);
-    printf("71+ years: %d patients\n", ageGroups[4]);
-
-    fclose(fp);
-
-    Report report;
-    sprintf(report.reportType, "Patient Statistics");
-    sprintf(report.description, "Statistical overview of %d patients", totalPatients);
-    getCurrentDateTime(report.generatedDate, report.generatedTime);
-    makeReportEntry(&report);
-
-    printf("\nPress Enter to return to menu...");
-    getchar();
-}
-
-void reportManagement() {
-    initializeMaxReportId();
-    int choice;
-
-    while (1) {
-        system("cls");
-        printf("==== Medical Reports ====\n\n");
-        printf("1. Patient Profile Report\n");
-        printf("2. Patient Appointment History\n");
-        printf("3. Daily Patient Report\n");
-        printf("4. Patient Statistics Report\n");
-        printf("5. View All Reports\n");
-        printf("6. Delete Report\n");
-        printf("7. Back to Main Menu\n");
-        printf("\nChoice: ");
-
-        if (scanf("%d", &choice) != 1) {
-            while (getchar() != '\n') {}
-            printf("Invalid input. Press Enter to continue...");
-            getchar();
-            continue;
-        }
-        getchar(); // consume newline
-
-        switch (choice) {
-            case 1:
-                generatePatientProfileReport();
-                break;
-            case 2:
-                generatePatientAppointmentHistory();
-                break;
-            case 3:
-                generateDailyPatientReport();
-                break;
-            case 4:
-                generatePatientStatisticsReport();
-                break;
-            case 5:
-                listAllReports();
-                break;
-            case 6: {
-                int reportId;
-                printf("Enter Report ID to delete: ");
-                scanf("%d", &reportId);
-                getchar();
-                deleteReport(reportId);
-                break;
+                    if (patId == patientId) {
+                        sprintf(line, "Appointment ID: %d\n", apptId);
+                        strcat(content, line);
+                        sprintf(line, "Doctor: %s\n", doctor);
+                        strcat(content, line);
+                        sprintf(line, "Date: %s\n", date);
+                        strcat(content, line);
+                        sprintf(line, "Time: %s\n", time);
+                        strcat(content, line);
+                        sprintf(line, "Purpose: %s\n", purpose);
+                        strcat(content, line);
+                        sprintf(line, "Status: %s\n\n", status);
+                        strcat(content, line);
+                        appointmentCount++;
+                    }
+                }
             }
-            case 7:
-                return;
-            default:
-                printf("Invalid choice. Press Enter to continue...");
+            fclose(fp);
+
+            sprintf(line, "Total Appointments: %d\n", appointmentCount);
+            strcat(content, line);
+        }
+
+        strcpy(report.content, content);
+        saveReport(&report);
+
+        printf("\n%s", content);
+        printf("\nReport saved with ID: %d\n", report.reportId);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void generateDailyPatientReport() {
+        char date[20];
+        printf("Enter date (DD/MM/YYYY): ");
+        fgets(date, sizeof(date), stdin);
+        date[strcspn(date, "\n")] = 0;
+
+        Report report = {0};
+        report.reportId = generateReportId();
+        report.type = DAILY_PATIENT;
+        sprintf(report.title, "Daily Patient Report - %s", date);
+
+        char content[2000];
+        sprintf(content, "==== DAILY PATIENT REPORT ====\nDate: %s\n\n", date);
+        char line[200];
+
+        FILE *fp = fopen("data/appointment.csv", "r");
+        if (!fp) {
+            strcat(content, "No appointment data found.\n");
+        } else {
+            int patientCount = 0;
+            char buffer[512];
+
+            while (fgets(buffer, sizeof(buffer), fp)) {
+                int apptId, patId;
+                char doctor[50], apptDate[20], time[10], purpose[100], status[20];
+
+                if (sscanf(buffer, "%d,%d,%49[^,],%19[^,],%9[^,],%99[^,],%19[^\n]",
+                          &apptId, &patId, doctor, apptDate, time, purpose, status) == 7) {
+
+                    if (strcmp(apptDate, date) == 0) {
+                        sprintf(line, "Patient ID: %d | Doctor: %s | Time: %s | Purpose: %s\n",
+                               patId, doctor, time, purpose);
+                        strcat(content, line);
+                        patientCount++;
+                    }
+                }
+            }
+            fclose(fp);
+
+            sprintf(line, "\nTotal Patients: %d\n", patientCount);
+            strcat(content, line);
+        }
+
+        strcpy(report.content, content);
+        saveReport(&report);
+
+        printf("\n%s", content);
+        printf("\nReport saved with ID: %d\n", report.reportId);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void generatePatientStatisticsReport() {
+        Report report = {0};
+        report.reportId = generateReportId();
+        report.type = PATIENT_STATISTICS;
+        strcpy(report.title, "Patient Statistics Report");
+
+        char content[2000] = "==== PATIENT STATISTICS REPORT ====\n\n";
+        char line[200];
+
+        FILE *fp = fopen("data/patient.csv", "r");
+        if (!fp) {
+            strcat(content, "No patient data found.\n");
+        } else {
+            int totalPatients = 0;
+            int maleCount = 0, femaleCount = 0;
+            int ageGroups[5] = {0}; // 0-18, 19-30, 31-50, 51-70, 70+
+
+            Patient patient;
+            while (fscanf(fp, "%d,%49[^,],%d,%c,%14[^,],%99[^,],%49[^,],%4[^,],%199[^,],%14[^,],%49[^\n]",
+                          &patient.patientId, patient.name, &patient.age, &patient.gender,
+                          patient.phone, patient.address, patient.email, patient.bloodType,
+                          patient.allergies, patient.emergencyContact, patient.primaryDoctor) >= 5) {
+                totalPatients++;
+
+                if (patient.gender == 'M') maleCount++;
+                else femaleCount++;
+
+                if (patient.age <= 18) ageGroups[0]++;
+                else if (patient.age <= 30) ageGroups[1]++;
+                else if (patient.age <= 50) ageGroups[2]++;
+                else if (patient.age <= 70) ageGroups[3]++;
+                else ageGroups[4]++;
+            }
+            fclose(fp);
+
+            sprintf(line, "Total Patients: %d\n", totalPatients);
+            strcat(content, line);
+            sprintf(line, "Male Patients: %d (%.1f%%)\n", maleCount,
+                    totalPatients > 0 ? (maleCount * 100.0 / totalPatients) : 0);
+            strcat(content, line);
+            sprintf(line, "Female Patients: %d (%.1f%%)\n\n", femaleCount,
+                    totalPatients > 0 ? (femaleCount * 100.0 / totalPatients) : 0);
+            strcat(content, line);
+
+            strcat(content, "Age Distribution:\n");
+            sprintf(line, "0-18 years: %d\n", ageGroups[0]);
+            strcat(content, line);
+            sprintf(line, "19-30 years: %d\n", ageGroups[1]);
+            strcat(content, line);
+            sprintf(line, "31-50 years: %d\n", ageGroups[2]);
+            strcat(content, line);
+            sprintf(line, "51-70 years: %d\n", ageGroups[3]);
+            strcat(content, line);
+            sprintf(line, "70+ years: %d\n", ageGroups[4]);
+            strcat(content, line);
+        }
+
+        strcpy(report.content, content);
+        saveReport(&report);
+
+        printf("\n%s", content);
+        printf("\nReport saved with ID: %d\n", report.reportId);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void generatePrescriptionReport() {
+        int patientId;
+        printf("Enter Patient ID (0 for all patients): ");
+        scanf("%d", &patientId);
+        getchar();
+
+        Report report = {0};
+        report.reportId = generateReportId();
+        report.type = PRESCRIPTION_REPORT;
+
+        if (patientId == 0) {
+            strcpy(report.title, "All Prescriptions Report");
+        } else {
+            sprintf(report.title, "Prescriptions Report - Patient ID: %d", patientId);
+        }
+
+        char content[2000] = "==== PRESCRIPTION REPORT ====\n\n";
+        char line[200];
+
+        FILE *fp = fopen(PRESCRIPTION_DATAFILE, "r");
+        if (!fp) {
+            strcat(content, "No prescription data found.\n");
+        } else {
+            int prescriptionCount = 0;
+            float totalAmount = 0.0;
+
+            Prescription prescription;
+            while (fscanf(fp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%49[^,],%99[^,],%49[^,],%199[^\n]",
+                          &prescription.prescriptionId, &prescription.patientId, &prescription.medicineId,
+                          prescription.medicineName, &prescription.quantity, &prescription.unitPrice,
+                          &prescription.totalPrice, prescription.prescribedDate, prescription.prescribedBy,
+                          prescription.dosage, prescription.duration, prescription.notes) == 12) {
+
+                if (patientId == 0 || prescription.patientId == patientId) {
+                    sprintf(line, "Prescription ID: %d\n", prescription.prescriptionId);
+                    strcat(content, line);
+                    sprintf(line, "Patient ID: %d\n", prescription.patientId);
+                    strcat(content, line);
+                    sprintf(line, "Medicine: %s\n", prescription.medicineName);
+                    strcat(content, line);
+                    sprintf(line, "Quantity: %d\n", prescription.quantity);
+                    strcat(content, line);
+                    sprintf(line, "Unit Price: $%.2f\n", prescription.unitPrice);
+                    strcat(content, line);
+                    sprintf(line, "Total: $%.2f\n", prescription.totalPrice);
+                    strcat(content, line);
+                    sprintf(line, "Date: %s\n", prescription.prescribedDate);
+                    strcat(content, line);
+                    sprintf(line, "Prescribed By: %s\n", prescription.prescribedBy);
+                    strcat(content, line);
+                    sprintf(line, "Dosage: %s\n", prescription.dosage);
+                    strcat(content, line);
+                    sprintf(line, "Duration: %s\n\n", prescription.duration);
+                    strcat(content, line);
+
+                    prescriptionCount++;
+                    totalAmount += prescription.totalPrice;
+                }
+            }
+            fclose(fp);
+
+            sprintf(line, "Total Prescriptions: %d\n", prescriptionCount);
+            strcat(content, line);
+            sprintf(line, "Total Amount: $%.2f\n", totalAmount);
+            strcat(content, line);
+        }
+
+        strcpy(report.content, content);
+        saveReport(&report);
+
+        printf("\n%s", content);
+        printf("\nReport saved with ID: %d\n", report.reportId);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void generateBillingReport() {
+        int patientId;
+        printf("Enter Patient ID (0 for all patients): ");
+        scanf("%d", &patientId);
+        getchar();
+
+        Report report = {0};
+        report.reportId = generateReportId();
+        report.type = BILLING_REPORT;
+
+        if (patientId == 0) {
+            strcpy(report.title, "All Bills Report");
+        } else {
+            sprintf(report.title, "Billing Report - Patient ID: %d", patientId);
+        }
+
+        char content[2000] = "==== BILLING REPORT ====\n\n";
+        char line[200];
+
+        FILE *fp = fopen(BILL_DATAFILE, "r");
+        if (!fp) {
+            strcat(content, "No billing data found.\n");
+        } else {
+            int billCount = 0;
+            float totalRevenue = 0.0;
+
+            Bill bill;
+            while (fscanf(fp, "%d,%d,%f,%f,%f,%f,%f,%19[^,],%19[^,],%199[^\n]",
+                          &bill.billId, &bill.patientId, &bill.consultationFee, &bill.medicineTotal,
+                          &bill.tax, &bill.discount, &bill.grandTotal, bill.billDate,
+                          bill.paymentStatus, bill.notes) == 10) {
+
+                if (patientId == 0 || bill.patientId == patientId) {
+                    sprintf(line, "Bill ID: %d\n", bill.billId);
+                    strcat(content, line);
+                    sprintf(line, "Patient ID: %d\n", bill.patientId);
+                    strcat(content, line);
+                    sprintf(line, "Consultation Fee: $%.2f\n", bill.consultationFee);
+                    strcat(content, line);
+                    sprintf(line, "Medicine Total: $%.2f\n", bill.medicineTotal);
+                    strcat(content, line);
+                    sprintf(line, "Tax: $%.2f\n", bill.tax);
+                    strcat(content, line);
+                    sprintf(line, "Discount: $%.2f\n", bill.discount);
+                    strcat(content, line);
+                    sprintf(line, "Grand Total: $%.2f\n", bill.grandTotal);
+                    strcat(content, line);
+                    sprintf(line, "Date: %s\n", bill.billDate);
+                    strcat(content, line);
+                    sprintf(line, "Payment Status: %s\n\n", bill.paymentStatus);
+                    strcat(content, line);
+
+                    billCount++;
+                    totalRevenue += bill.grandTotal;
+                }
+            }
+            fclose(fp);
+
+            sprintf(line, "Total Bills: %d\n", billCount);
+            strcat(content, line);
+            sprintf(line, "Total Revenue: $%.2f\n", totalRevenue);
+            strcat(content, line);
+        }
+
+        strcpy(report.content, content);
+        saveReport(&report);
+
+        printf("\n%s", content);
+        printf("\nReport saved with ID: %d\n", report.reportId);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void prescriptionManagement() {
+        int choice;
+
+        while (1) {
+            system("cls");
+            printf("==== Prescription Management ====\n\n");
+            printf("1. Add Prescription\n");
+            printf("2. View Patient Prescriptions\n");
+            printf("3. View All Prescriptions\n");
+            printf("4. Delete Prescription\n");
+            printf("5. Back to Reports Menu\n");
+            printf("\nChoice: ");
+
+            if (scanf("%d", &choice) != 1) {
+                while (getchar() != '\n') {}
+                printf("Invalid input. Press Enter to continue...");
                 getchar();
+                continue;
+            }
+            getchar();
+
+            switch (choice) {
+                case 1:
+                    addPrescription();
+                    break;
+                case 2:
+                    viewPatientPrescriptions();
+                    break;
+                case 3:
+                    viewAllPrescriptions();
+                    break;
+                case 4: {
+                    int prescriptionId;
+                    printf("Enter Prescription ID to delete: ");
+                    scanf("%d", &prescriptionId);
+                    getchar();
+                    deletePrescription(prescriptionId);
+                    break;
+                }
+                case 5:
+                    return;
+                default:
+                    printf("Invalid choice. Press Enter to continue...");
+                    getchar();
+            }
         }
     }
-}
+
+    void addPrescription() {
+        Prescription prescription = {0};
+        prescription.prescriptionId = generatePrescriptionId();
+
+        printf("\n==== Add New Prescription ====\n");
+
+        printf("Patient ID: ");
+        scanf("%d", &prescription.patientId);
+        getchar();
+
+        printf("Medicine ID: ");
+        scanf("%d", &prescription.medicineId);
+        getchar();
+
+        // Get medicine details
+        const Medicine medicine = findMedicine(prescription.medicineId);
+        if (medicine.medicineId == 0) {
+            printf("Medicine not found!\n");
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        strcpy(prescription.medicineName, medicine.name);
+        prescription.unitPrice = medicine.price;
+
+        printf("Quantity: ");
+        scanf("%d", &prescription.quantity);
+        getchar();
+
+        prescription.totalPrice = prescription.quantity * prescription.unitPrice;
+
+        printf("Prescribed by (Doctor name): ");
+        fgets(prescription.prescribedBy, sizeof(prescription.prescribedBy), stdin);
+        prescription.prescribedBy[strcspn(prescription.prescribedBy, "\n")] = 0;
+
+        printf("Dosage: ");
+        fgets(prescription.dosage, sizeof(prescription.dosage), stdin);
+        prescription.dosage[strcspn(prescription.dosage, "\n")] = 0;
+
+        printf("Duration: ");
+        fgets(prescription.duration, sizeof(prescription.duration), stdin);
+        prescription.duration[strcspn(prescription.duration, "\n")] = 0;
+
+        printf("Notes: ");
+        fgets(prescription.notes, sizeof(prescription.notes), stdin);
+        prescription.notes[strcspn(prescription.notes, "\n")] = 0;
+
+        // Set current date
+        time_t now;
+        time(&now);
+        const struct tm *timeinfo = localtime(&now);
+        strftime(prescription.prescribedDate, sizeof(prescription.prescribedDate), "%d/%m/%Y", timeinfo);
+
+        savePrescription(&prescription);
+
+        printf("Prescription added successfully with ID: %d\n", prescription.prescriptionId);
+        printf("Total cost: $%.2f\n", prescription.totalPrice);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void viewPatientPrescriptions() {
+        int patientId;
+        printf("Enter Patient ID: ");
+        scanf("%d", &patientId);
+        getchar();
+
+        FILE *fp = fopen(PRESCRIPTION_DATAFILE, "r");
+        if (!fp) {
+            printf("No prescription data found.\n");
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        printf("\n==== Prescriptions for Patient ID: %d ====\n", patientId);
+        printf("%-5s %-20s %-4s %-10s %-10s %-12s %-15s\n",
+               "ID", "Medicine", "Qty", "Unit Price", "Total", "Date", "Prescribed By");
+        printf("--------------------------------------------------------------------------------\n");
+
+        Prescription prescription;
+        int found = 0;
+
+        while (fscanf(fp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%49[^,],%99[^,],%49[^,],%199[^\n]",
+                      &prescription.prescriptionId, &prescription.patientId, &prescription.medicineId,
+                      prescription.medicineName, &prescription.quantity, &prescription.unitPrice,
+                      &prescription.totalPrice, prescription.prescribedDate, prescription.prescribedBy,
+                      prescription.dosage, prescription.duration, prescription.notes) == 12) {
+
+            if (prescription.patientId == patientId) {
+                printf("%-5d %-20s %-4d $%-9.2f $%-9.2f %-12s %-15s\n",
+                       prescription.prescriptionId, prescription.medicineName, prescription.quantity,
+                       prescription.unitPrice, prescription.totalPrice, prescription.prescribedDate,
+                       prescription.prescribedBy);
+                found = 1;
+            }
+        }
+
+        if (!found) {
+            printf("No prescriptions found for this patient.\n");
+        }
+
+        fclose(fp);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void viewAllPrescriptions() {
+        FILE *fp = fopen(PRESCRIPTION_DATAFILE, "r");
+        if (!fp) {
+            printf("No prescription data found.\n");
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        printf("\n==== All Prescriptions ====\n");
+        printf("%-5s %-10s %-20s %-4s %-10s %-10s %-12s\n",
+               "ID", "Patient", "Medicine", "Qty", "Unit Price", "Total", "Date");
+        printf("--------------------------------------------------------------------------------\n");
+
+        Prescription prescription;
+        while (fscanf(fp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%49[^,],%99[^,],%49[^,],%199[^\n]",
+                      &prescription.prescriptionId, &prescription.patientId, &prescription.medicineId,
+                      prescription.medicineName, &prescription.quantity, &prescription.unitPrice,
+                      &prescription.totalPrice, prescription.prescribedDate, prescription.prescribedBy,
+                      prescription.dosage, prescription.duration, prescription.notes) == 12) {
+
+            printf("%-5d %-10d %-20s %-4d $%-9.2f $%-9.2f %-12s\n",
+                   prescription.prescriptionId, prescription.patientId, prescription.medicineName,
+                   prescription.quantity, prescription.unitPrice, prescription.totalPrice,
+                   prescription.prescribedDate);
+        }
+
+        fclose(fp);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void deletePrescription(const int prescriptionId) {
+        FILE *fp = fopen(PRESCRIPTION_DATAFILE, "r");
+        if (!fp) {
+            printf("No prescription data found.\n");
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        FILE *temp = fopen("data/temp_prescriptions.csv", "w");
+        if (!temp) {
+            printf("Error creating temporary file.\n");
+            fclose(fp);
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        Prescription prescription;
+        int found = 0;
+
+        while (fscanf(fp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%49[^,],%99[^,],%49[^,],%199[^\n]",
+                      &prescription.prescriptionId, &prescription.patientId, &prescription.medicineId,
+                      prescription.medicineName, &prescription.quantity, &prescription.unitPrice,
+                      &prescription.totalPrice, prescription.prescribedDate, prescription.prescribedBy,
+                      prescription.dosage, prescription.duration, prescription.notes) == 12) {
+
+            if (prescription.prescriptionId != prescriptionId) {
+                fprintf(temp, "%d,%d,%d,%s,%d,%.2f,%.2f,%s,%s,%s,%s,%s\n",
+                        prescription.prescriptionId, prescription.patientId, prescription.medicineId,
+                        prescription.medicineName, prescription.quantity, prescription.unitPrice,
+                        prescription.totalPrice, prescription.prescribedDate, prescription.prescribedBy,
+                        prescription.dosage, prescription.duration, prescription.notes);
+            } else {
+                found = 1;
+            }
+        }
+
+        fclose(fp);
+        fclose(temp);
+
+        if (found) {
+            remove(PRESCRIPTION_DATAFILE);
+            rename("data/temp_prescriptions.csv", PRESCRIPTION_DATAFILE);
+            printf("Prescription deleted successfully.\n");
+        } else {
+            remove("data/temp_prescriptions.csv");
+            printf("Prescription with ID %d not found.\n", prescriptionId);
+        }
+
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void viewAllReports() {
+        FILE *fp = fopen(REPORT_DATAFILE, "r");
+        if (!fp) {
+            printf("No reports found.\n");
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        printf("\n==== All Reports ====\n");
+        printf("%-5s %-15s %-12s %-30s\n", "ID", "Type", "Date", "Title");
+        printf("----------------------------------------------------------------\n");
+
+        Report report;
+        while (fscanf(fp, "%d,%d,%19[^,],%99[^,],%[^\n]",
+                      &report.reportId, &report.type, report.generatedDate,
+                      report.title, report.content) == 5) {
+
+            const char* typeStr;
+            switch(report.type) {
+                case PATIENT_PROFILE: typeStr = "Patient Profile"; break;
+                case APPOINTMENT_HISTORY: typeStr = "Appointment Hist"; break;
+                case DAILY_PATIENT: typeStr = "Daily Patient"; break;
+                case PATIENT_STATISTICS: typeStr = "Patient Stats"; break;
+                case PRESCRIPTION_REPORT: typeStr = "Prescription"; break;
+                case BILLING_REPORT: typeStr = "Billing"; break;
+                default: typeStr = "Unknown"; break;
+            }
+
+            printf("%-5d %-15s %-12s %-30s\n",
+                   report.reportId, typeStr, report.generatedDate, report.title);
+        }
+
+        fclose(fp);
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void deleteReport() {
+        int reportId;
+        printf("Enter Report ID to delete: ");
+        scanf("%d", &reportId);
+        getchar();
+
+        FILE *fp = fopen(REPORT_DATAFILE, "r");
+        if (!fp) {
+            printf("No reports found.\n");
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        FILE *temp = fopen("data/temp_reports.csv", "w");
+        if (!temp) {
+            printf("Error creating temporary file.\n");
+            fclose(fp);
+            printf("Press Enter to return to menu...");
+            getchar();
+            return;
+        }
+
+        Report report;
+        int found = 0;
+
+        while (fscanf(fp, "%d,%d,%19[^,],%99[^,],%[^\n]",
+                      &report.reportId, &report.type, report.generatedDate,
+                      report.title, report.content) == 5) {
+
+            if (report.reportId != reportId) {
+                fprintf(temp, "%d,%d,%s,%s,%s\n",
+                        report.reportId, report.type, report.generatedDate,
+                        report.title, report.content);
+            } else {
+                found = 1;
+            }
+        }
+
+        fclose(fp);
+        fclose(temp);
+
+        if (found) {
+            remove(REPORT_DATAFILE);
+            rename("data/temp_reports.csv", REPORT_DATAFILE);
+            printf("Report deleted successfully.\n");
+        } else {
+            remove("data/temp_reports.csv");
+            printf("Report with ID %d not found.\n", reportId);
+        }
+
+        printf("Press Enter to return to menu...");
+        getchar();
+    }
+
+    void reportManagement() {
+        int choice;
+
+        while (1) {
+            system("cls");
+            printf("==== Medical Reports ====\n\n");
+            printf("1. Patient Profile Report\n");
+            printf("2. Patient Appointment History\n");
+            printf("3. Daily Patient Report\n");
+            printf("4. Patient Statistics Report\n");
+            printf("5. Prescription Report\n");
+            printf("6. Billing Report\n");
+            printf("7. Prescription Management\n");
+            printf("8. View All Reports\n");
+            printf("9. Delete Report\n");
+            printf("10. Back to Main Menu\n");
+            printf("\nChoice: ");
+
+            if (scanf("%d", &choice) != 1) {
+                while (getchar() != '\n') {}
+                printf("Invalid input. Press Enter to continue...");
+                getchar();
+                continue;
+            }
+            getchar();
+
+            switch (choice) {
+                case 1:
+                    generatePatientProfileReport();
+                    break;
+                case 2:
+                    generateAppointmentHistoryReport();
+                    break;
+                case 3:
+                    generateDailyPatientReport();
+                    break;
+                case 4:
+                    generatePatientStatisticsReport();
+                    break;
+                case 5:
+                    generatePrescriptionReport();
+                    break;
+                case 6:
+                    generateBillingReport();
+                    break;
+                case 7:
+                    prescriptionManagement();
+                    break;
+                case 8:
+                    viewAllReports();
+                    break;
+                case 9:
+                    deleteReport();
+                    break;
+                case 10:
+                    return;
+                default:
+                    printf("Invalid choice. Press Enter to continue...");
+                    getchar();
+            }
+        }
+    }
