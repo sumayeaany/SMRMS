@@ -12,6 +12,8 @@ set(SOURCES
         src/appointment.c
         include/appointment.h
         include/patient.h
+        include/medicine.h
+        src/medicine.c
 )
 
 add_executable(smrms ${SOURCES})
