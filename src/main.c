@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include "patient.h"
 #include  "appointment.h"
+#include "medicine.h"
 
-void medicineInventory();
 void medicalReports();
 void emergencyPatientQueue();
 
@@ -41,7 +41,7 @@ int main() {
                 appointmentInformationLookup();
                 break;
             case 3:
-                medicineInventory();
+                medicineInventoryLookup();
                 break;
             case 4:
                 medicalReports();
@@ -60,12 +60,6 @@ int main() {
     }
 }
 
-
-void medicineInventory() {
-    printf("\n[Medicine Inventory] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
 
 void medicalReports() {
     printf("\n[Medical Reports] - Coming Soon!\n");
