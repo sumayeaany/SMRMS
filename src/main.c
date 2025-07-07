@@ -3,6 +3,7 @@
 #include "patient.h"
 #include  "appointment.h"
 #include "medicine.h"
+#include "report.h"
 
 void medicalReports();
 void emergencyPatientQueue();
@@ -44,7 +45,7 @@ int main() {
                 medicineInventoryLookup();
                 break;
             case 4:
-                medicalReports();
+                reportManagement();
                 break;
             case 5:
                 emergencyPatientQueue();
@@ -60,12 +61,6 @@ int main() {
     }
 }
 
-
-void medicalReports() {
-    printf("\n[Medical Reports] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
 
 void emergencyPatientQueue(){
     printf("\n[Emergency Patient Queue] - Coming Soon!\n");
