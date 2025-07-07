@@ -1,23 +1,31 @@
 #ifndef PATIENT_H
 #define PATIENT_H
 
-#define MAX_NAME_LEN 50
-#define MAX_PHONE_LEN 12  
-
+// Patient structure with expanded information
 typedef struct {
-    char name[MAX_NAME_LEN];
+    int patientId;          // Unique identifier
+    char name[50];
     int age;
-    char number[MAX_PHONE_LEN];
-} patient;
+    char gender;            // 'M', 'F', or 'O'
+    char phone[15];
+    char address[100];
+    char email[50];
+    char bloodType[5];      // A+, B-, O+, etc.
+    char allergies[200];    // Known allergies// Insurance provider
+    char emergencyContact[100]; // Emergency contact info
+    char primaryDoctor[50]; // Primary care physician
+} Patient;
 
-// Checks if a patient with given name or phone exists in the CSV file
-// Returns 1 if found, 0 otherwise
-int exists(char name[], char phn[]);
-
-// Shows patient details for the given phone number
-void show(char phn[]);
-
-// Adds a new patient record to the CSV file if it doesn't already exist
-void makeEntry(char name[], int age, char phn[]);
+// Function declarations
+void initializeMaxPatientId();
+int generatePatientId();
+Patient makePatient(const char*, const char*);
+Patient findPatient(int, const char*);
+void show(Patient*);
+void makeEntry(Patient*);
+void listAllPatients();
+void editPatient(int, Patient);
+void deletePatient(int);
+void patientInformationLookup();
 
 #endif // PATIENT_H
