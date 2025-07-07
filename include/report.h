@@ -1,18 +1,38 @@
-//
-// Created by User on 08-Jul-25.
-//
+#ifndef REPORTS_H
+#define REPORTS_H
 
-#ifndef REPORT_H
-#define REPORT_H
+#include "patient.h"
+#include "appointment.h"
+#include "medicine.h"
+
+typedef struct {
+    int reportId;
+    char reportType[30];
+    char generatedDate[12];
+    char generatedTime[10];
+    char description[200];
+} Report;
 
 // Function declarations
-void reportsLookup();
-void generatePatientMedicalReport();
-void generateMedicineStockReport();
-void generateAppointmentSummaryReport();
-void generateUpcomingAppointmentsReport();
-void generateLowStockReport();
-void searchAndPrintPatientHistory();
-void printDailyAppointmentReport();
+void reportManagement();
+Report makeReport();
+void makeReportEntry(Report* report);
+Report findReport(const int reportId);
+void showReport(Report* report);
+void listAllReports();
+void deleteReport(const int reportId);
 
-#endif //REPORT_H
+// Patient-focused report functions
+void generatePatientProfileReport();
+void generatePatientAppointmentHistory();
+void generatePatientMedicationReport();
+void generateDailyPatientReport();
+void generatePatientStatisticsReport();
+void generatePatientsByDoctorReport();
+void generatePatientsByAgeGroupReport();
+void searchPatientReports();
+
+int generateReportId();
+void initializeMaxReportId();
+
+#endif

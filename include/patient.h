@@ -1,31 +1,31 @@
 #ifndef PATIENT_H
 #define PATIENT_H
 
-// Patient structure with expanded information
 typedef struct {
-    int patientId;          // Unique identifier
+    int patientId;
     char name[50];
     int age;
-    char gender;            // 'M', 'F', or 'O'
+    char gender;
     char phone[15];
     char address[100];
     char email[50];
-    char bloodType[5];      // A+, B-, O+, etc.
-    char allergies[200];    // Known allergies// Insurance provider
-    char emergencyContact[100]; // Emergency contact info
-    char primaryDoctor[50]; // Primary care physician
+    char bloodType[5];
+    char allergies[200];
+    char emergencyContact[15];
+    char primaryDoctor[50];
 } Patient;
 
 // Function declarations
-void initializeMaxPatientId();
-int generatePatientId();
-Patient makePatient(const char*, const char*);
-Patient findPatient(int, const char*);
-void show(Patient*);
-void makeEntry(Patient*);
-void listAllPatients();
-void editPatient(int, Patient);
-void deletePatient(int);
 void patientInformationLookup();
+Patient makePatient();
+void makePatientEntry(Patient* patient);
+Patient findPatient(const int searchType, const char* searchValue);
+void showPatient(Patient* patient);
+void listAllPatients();
+void editPatient(const int patientId, Patient* patient);
+void deletePatient(const int patientId);
+void searchPatient();
+int generatePatientId();
+void initializeMaxPatientId();
 
-#endif // PATIENT_H
+#endif
