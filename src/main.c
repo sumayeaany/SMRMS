@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "patient.h"
+#include  "appointment.h"
 
-void patientInformationLookup();
-void doctorAppointment();
 void medicineInventory();
 void medicalReports();
 void emergencyPatientQueue();
@@ -12,7 +11,7 @@ int main() {
     int choice;
 
     while (1) {
-        system("cls");  
+        system("cls");
         printf("==== ==== Welcome to Smart Medical Record Management System ==== ==== \n\n");
         printf("1. Patient Information Lookup\n");
         printf("2. Doctor Appointment\n");
@@ -21,18 +20,25 @@ int main() {
         printf("5. Emergency Patient Queue\n");
         printf("6. Exit\n");
         printf("\nChoice: ");
-        
+        fflush(stdout);  // Ensure the prompt is displayed
+
         if (scanf("%d", &choice) != 1) {
-            while (getchar() != '\n');
+            // Handle invalid input
+            while (getchar() != '\n') {}
+            printf("Invalid input. Press Enter to continue...");
+            getchar();
             continue;
         }
+
+        // Clear input buffer after successful read
+        while (getchar() != '\n') {}
 
         switch (choice) {
             case 1:
                 patientInformationLookup();
                 break;
             case 2:
-                doctorAppointment();
+                appointmentInformationLookup();
                 break;
             case 3:
                 medicineInventory();
@@ -45,52 +51,15 @@ int main() {
                 break;
             case 6:
                 printf("Exiting SMRMS... Goodbye!\n");
-                return 0;
+                exit(0);
             default:
                 printf("Invalid choice. Please enter 1-6.\n");
                 printf("Press Enter to continue...");
-                getchar(); getchar();
-        }
-    }
-
-    return 0;
-}
-
-void patientInformationLookup() {
-    int choice;
-    char name[50], phone[12];
-    int age;
-
-    printf("\n1. Search Patient\n2. Back\n\nChoice: ");
-    scanf("%d", &choice);
-
-    if (choice == 2) return; 
-    
-
-    printf("Name: ");
-    scanf("%s", name);
-    printf("Number: ");
-    scanf("%s", phone);
-
-    if (exists(name, phone)) show(phone);
-    else
-    {
-        printf("No entry for this patient!\nAdd one? (y/n): ");
-        char c;
-        scanf(" %c", &c); 
-        if (c == 'y' || c == 'Y') {
-            printf("Age: ");
-            scanf("%d", &age);
-            makeEntry(name, age, phone);
+                getchar();
         }
     }
 }
 
-void doctorAppointment() {
-    printf("\n[Doctor Appointment] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
 
 void medicineInventory() {
     printf("\n[Medicine Inventory] - Coming Soon!\n");
@@ -104,7 +73,7 @@ void medicalReports() {
     getchar(); getchar();
 }
 
-void emergencyPatientQueue() {
+void emergencyPatientQueue(){
     printf("\n[Emergency Patient Queue] - Coming Soon!\n");
     printf("Press Enter to return to menu...");
     getchar(); getchar();
