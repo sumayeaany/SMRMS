@@ -7,8 +7,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 set(SOURCES
-    src/main.c
-    src/patient.c
+        src/main.c
+        src/patient.c
+        src/appointment.c
+        include/appointment.h
+        include/patient.h
 )
 
 add_executable(smrms ${SOURCES})
