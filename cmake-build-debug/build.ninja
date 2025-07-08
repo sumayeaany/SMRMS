@@ -91,6 +91,13 @@ build CMakeFiles/smrms.dir/src/emergency.c.obj: C_COMPILER__smrms_unscanned_Debu
   OBJECT_DIR = CMakeFiles\smrms.dir
   OBJECT_FILE_DIR = CMakeFiles\smrms.dir\src
 
+build CMakeFiles/smrms.dir/src/auth.c.obj: C_COMPILER__smrms_unscanned_Debug E$:/SMRMS/src/auth.c || cmake_object_order_depends_target_smrms
+  DEP_FILE = CMakeFiles\smrms.dir\src\auth.c.obj.d
+  FLAGS = -g -std=gnu17 -fdiagnostics-color=always
+  INCLUDES = -IE:/SMRMS/include
+  OBJECT_DIR = CMakeFiles\smrms.dir
+  OBJECT_FILE_DIR = CMakeFiles\smrms.dir\src
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target smrms
@@ -99,7 +106,7 @@ build CMakeFiles/smrms.dir/src/emergency.c.obj: C_COMPILER__smrms_unscanned_Debu
 #############################################
 # Link the executable smrms.exe
 
-build smrms.exe: C_EXECUTABLE_LINKER__smrms_Debug CMakeFiles/smrms.dir/src/main.c.obj CMakeFiles/smrms.dir/src/patient.c.obj CMakeFiles/smrms.dir/src/appointment.c.obj CMakeFiles/smrms.dir/src/medicine.c.obj CMakeFiles/smrms.dir/src/report.c.obj CMakeFiles/smrms.dir/src/emergency.c.obj
+build smrms.exe: C_EXECUTABLE_LINKER__smrms_Debug CMakeFiles/smrms.dir/src/main.c.obj CMakeFiles/smrms.dir/src/patient.c.obj CMakeFiles/smrms.dir/src/appointment.c.obj CMakeFiles/smrms.dir/src/medicine.c.obj CMakeFiles/smrms.dir/src/report.c.obj CMakeFiles/smrms.dir/src/emergency.c.obj CMakeFiles/smrms.dir/src/auth.c.obj
   FLAGS = -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\smrms.dir
@@ -108,59 +115,6 @@ build smrms.exe: C_EXECUTABLE_LINKER__smrms_Debug CMakeFiles/smrms.dir/src/main.
   TARGET_FILE = smrms.exe
   TARGET_IMPLIB = libsmrms.dll.a
   TARGET_PDB = smrms.exe.dbg
-
-# =============================================================================
-# Object build statements for EXECUTABLE target test_patient
-
-
-#############################################
-# Order-only phony target for test_patient
-
-build cmake_object_order_depends_target_test_patient: phony || .
-
-build CMakeFiles/test_patient.dir/tests/test_patient.c.obj: C_COMPILER__test_patient_unscanned_Debug E$:/SMRMS/tests/test_patient.c || cmake_object_order_depends_target_test_patient
-  DEP_FILE = CMakeFiles\test_patient.dir\tests\test_patient.c.obj.d
-  FLAGS = -g -std=gnu17 -fdiagnostics-color=always
-  INCLUDES = -IE:/SMRMS/include
-  OBJECT_DIR = CMakeFiles\test_patient.dir
-  OBJECT_FILE_DIR = CMakeFiles\test_patient.dir\tests
-
-build CMakeFiles/test_patient.dir/src/patient.c.obj: C_COMPILER__test_patient_unscanned_Debug E$:/SMRMS/src/patient.c || cmake_object_order_depends_target_test_patient
-  DEP_FILE = CMakeFiles\test_patient.dir\src\patient.c.obj.d
-  FLAGS = -g -std=gnu17 -fdiagnostics-color=always
-  INCLUDES = -IE:/SMRMS/include
-  OBJECT_DIR = CMakeFiles\test_patient.dir
-  OBJECT_FILE_DIR = CMakeFiles\test_patient.dir\src
-
-
-# =============================================================================
-# Link build statements for EXECUTABLE target test_patient
-
-
-#############################################
-# Link the executable test_patient.exe
-
-build test_patient.exe: C_EXECUTABLE_LINKER__test_patient_Debug CMakeFiles/test_patient.dir/tests/test_patient.c.obj CMakeFiles/test_patient.dir/src/patient.c.obj
-  FLAGS = -g
-  LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
-  OBJECT_DIR = CMakeFiles\test_patient.dir
-  POST_BUILD = cd .
-  PRE_LINK = cd .
-  TARGET_FILE = test_patient.exe
-  TARGET_IMPLIB = libtest_patient.dll.a
-  TARGET_PDB = test_patient.exe.dbg
-
-
-#############################################
-# Utility command for test
-
-build CMakeFiles/test.util: CUSTOM_COMMAND
-  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D E:\SMRMS\cmake-build-debug && "F:\CLion 2024.2.2\bin\cmake\win\x64\bin\ctest.exe" --force-new-ctest-process "
-  DESC = Running tests...
-  pool = console
-  restat = 1
-
-build test: phony CMakeFiles/test.util
 
 
 #############################################
@@ -190,8 +144,6 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 
 build smrms: phony smrms.exe
 
-build test_patient: phony test_patient.exe
-
 # =============================================================================
 # Folder targets.
 
@@ -200,7 +152,7 @@ build test_patient: phony test_patient.exe
 #############################################
 # Folder: E:/SMRMS/cmake-build-debug
 
-build all: phony smrms.exe test_patient.exe
+build all: phony smrms.exe
 
 # =============================================================================
 # Built-in targets

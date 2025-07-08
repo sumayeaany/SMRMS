@@ -18,6 +18,8 @@ set(SOURCES
         src/report.c
         include/emergency.h
         src/emergency.c
+        src/auth.c
+        include/auth.h
 )
 
 add_executable(smrms ${SOURCES})
@@ -28,10 +30,4 @@ add_custom_command(TARGET smrms POST_BUILD
         COMMENT "Copying executable to project root"
 )
 
-enable_testing()
-
-add_executable(test_patient tests/test_patient.c src/patient.c)
-target_include_directories(test_patient PRIVATE include)
-
-add_test(NAME TestPatient COMMAND test_patient)
 

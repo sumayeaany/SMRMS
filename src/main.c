@@ -5,11 +5,20 @@
 #include "medicine.h"
 #include "report.h"
 #include "emergency.h"
-
+#include "auth.h"
 int main() {
+    // system("cls");
+    //
+    // createDefaultUser();
+    //
+    // if (!loginScreen()) {
+    //     return 1;
+    // }
+
     int choice;
 
     while (1) {
+
         system("cls");
         printf("==== ==== Welcome to Smart Medical Record Management System ==== ==== \n\n");
         printf("1. Patient Information Lookup\n");
@@ -17,7 +26,8 @@ int main() {
         printf("3. Medicine Inventory\n");
         printf("4. Medical Reports\n");
         printf("5. Emergency Patient Queue\n");
-        printf("6. Exit\n");
+        printf("6. User Management\n");
+        printf("7. Exit\n");
         printf("\nChoice: ");
         fflush(stdout);  // Ensure the prompt is displayed
 
@@ -49,6 +59,9 @@ int main() {
                 emergencyPatientQueue();
                 break;
             case 6:
+                userManagement();
+                break;
+            case 7:
                 printf("Exiting SMRMS... Goodbye!\n");
                 exit(0);
             default:
