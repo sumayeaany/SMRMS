@@ -49,3 +49,6 @@
 2	81	7737112793969320	CMakeFiles/smrms.dir/src/report.c.obj	6add9b755ab00537
 2	84	7737113200665936	CMakeFiles/smrms.dir/src/emergency.c.obj	9881bf7474dc949e
 84	173	7737113201495941	smrms.exe	c5d5bb08fde78b6
+2	56	7737169068384899	CMakeFiles/smrms.dir/src/main.c.obj	30040265227f1871
+2	85	7737169488297419	CMakeFiles/smrms.dir/src/emergency.c.obj	9881bf7474dc949e
+85	176	7737169489127542	smrms.exe	c5d5bb08fde78b6

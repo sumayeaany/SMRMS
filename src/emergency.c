@@ -7,7 +7,6 @@
 #include "patient.h"
 #include "appointment.h"
 #include "medicine.h"
-#include "patient.h"
 
 #define EMERGENCY_DATAFILE "data/emergency.csv"
 
@@ -45,13 +44,13 @@ static void setEmergencyOrNA(char* dest, const char* input, const size_t size) {
     dest[size - 1] = '\0';
 }
 
-void getCurrentDateTime(char* date, char* timeStr) {
+void getCurrentDateTime(char* date, char* ttime) {
     time_t now;
     time(&now);
-    struct tm* tm_info = localtime(&now);
+    const struct tm* tm_info = localtime(&now);
 
     strftime(date, 11, "%d/%m/%Y", tm_info);
-    strftime(timeStr, 9, "%H:%M:%S", tm_info);
+    strftime(ttime, 9, "%H:%M:%S", tm_info);
 }
 
 int generateEmergencyId() {
@@ -382,12 +381,13 @@ void dischargePatient() {
     int found = 0;
     int emergPatientId, priority;
     char patientName[50], phoneNumber[20], symptoms[200], arrivalDate[20], arrivalTime[10];
-    char status[20], assignedDoctor[50], treatment[200], notes[200];
+    char status[20], assignedDoctor[50], treatment[200];
 
     while (fgets(emergencyLine, sizeof(emergencyLine), fp)) {
+        char notes[200];
         if (sscanf(emergencyLine, "%d,%d,%49[^,],%19[^,],%199[^,],%d,%19[^,],%9[^,],%19[^,],%49[^,],%199[^,],%199[^\n]",
-                  &emergencyId, &emergPatientId, patientName, phoneNumber, symptoms, &priority,
-                  arrivalDate, arrivalTime, status, assignedDoctor, treatment, notes) == 12) {
+                   &emergencyId, &emergPatientId, patientName, phoneNumber, symptoms, &priority,
+                   arrivalDate, arrivalTime, status, assignedDoctor, treatment, notes) == 12) {
             found = 1;
             break;
         }
