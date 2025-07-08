@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "patient.h"
-
-void doctorAppointment();
-void medicineInventory();
-void medicalReports();
-void emergencyPatientQueue();
+#include  "appointment.h"
+#include "medicine.h"
+#include "report.h"
+#include "emergency.h"
 
 int main() {
     int choice;
@@ -38,13 +37,13 @@ int main() {
                 patientInformationLookup();
                 break;
             case 2:
-                doctorAppointment();
+                appointmentInformationLookup();
                 break;
             case 3:
-                medicineInventory();
+                medicineInventoryLookup();
                 break;
             case 4:
-                medicalReports();
+                reportManagement();
                 break;
             case 5:
                 emergencyPatientQueue();
@@ -61,27 +60,3 @@ int main() {
 }
 
 
-
-void doctorAppointment() {
-    printf("\n[Doctor Appointment] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
-
-void medicineInventory() {
-    printf("\n[Medicine Inventory] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
-
-void medicalReports() {
-    printf("\n[Medical Reports] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
-
-void emergencyPatientQueue(){
-    printf("\n[Emergency Patient Queue] - Coming Soon!\n");
-    printf("Press Enter to return to menu...");
-    getchar(); getchar();
-}
