@@ -20,6 +20,8 @@ set(SOURCES
         src/emergency.c
         src/auth.c
         include/auth.h
+        include/prescription.h
+        src/prescription.c
 )
 
 add_executable(smrms ${SOURCES})

@@ -19,20 +19,6 @@ typedef struct {
     char content[2000];
 } Report;
 
-typedef struct {
-    int prescriptionId;
-    int patientId;
-    int medicineId;
-    char medicineName[50];
-    int quantity;
-    float unitPrice;
-    float totalPrice;
-    char prescribedDate[20];
-    char prescribedBy[50];
-    char dosage[100];
-    char duration[50];
-    char notes[200];
-} Prescription;
 
 typedef struct {
     int billId;
@@ -47,7 +33,7 @@ typedef struct {
     float grandTotal;
     char paymentStatus[20];
     char paymentMethod[20];
-    char notes[200];  // Add this missing field
+    char notes[200];
 } Bill;
 
 // Report functions
@@ -61,13 +47,6 @@ void generateBillingReport();
 void viewAllReports();
 void deleteReport();
 
-// Prescription functions
-void prescriptionManagement();
-void addPrescription();
-void viewPatientPrescriptions();
-void viewAllPrescriptions();
-void deletePrescription();
-
 // Billing functions
 void billingManagement();
 void generatePatientBill();
@@ -80,9 +59,7 @@ int generateReportId();
 int generatePrescriptionId();
 int generateBillId();
 void saveReport(Report* report);
-void savePrescription(Prescription* prescription);
 void saveBill(Bill* bill);
-Prescription findPrescription(int prescriptionId);
 Bill findBill(int billId);
 
 #endif //REPORT_H

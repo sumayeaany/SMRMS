@@ -38,7 +38,85 @@ static void setPatientOrNA(char* dest, const char* input, const size_t size) {
         strncpy(dest, "N/A", size - 1);
     dest[size - 1] = '\0';
 }
+Patient findPatientByNameAndPhone(const char* name, const char* phone) {
+    Patient patient = {0};
+    FILE *fp = fopen(PATIENT_DATAFILE, "r");
+    if (!fp) {
+        printf("Unable to open patient data file\n");
+        return patient;
+    }
 
+    while (fscanf(fp, "%d,%49[^,],%d,%c,%14[^,],%99[^,],%49[^,],%4[^,],%199[^,],%14[^,],%49[^\n]",
+                  &patient.patientId, patient.name, &patient.age, &patient.gender,
+                  patient.phone, patient.address, patient.email, patient.bloodType,
+                  patient.allergies, patient.emergencyContact, patient.primaryDoctor) >= 5) {
+
+        // Case-insensitive name comparison
+        char nameLower[50], searchLower[50];
+        strcpy(nameLower, patient.name);
+        strcpy(searchLower, name);
+
+        for (int i = 0; nameLower[i]; i++)
+            nameLower[i] = tolower((int)nameLower[i]);
+        for (int i = 0; searchLower[i]; i++)
+            searchLower[i] = tolower((int)searchLower[i]);
+
+        // Check if both name and phone match
+        if (strstr(nameLower, searchLower) && strcmp(patient.phone, phone) == 0) {
+            fclose(fp);
+            return patient;
+        }
+    }
+
+    fclose(fp);
+    patient.patientId = 0; // Not found
+    return patient;
+}
+
+int searchAndShowPatientsByName(const char* name) {
+    FILE *fp = fopen(PATIENT_DATAFILE, "r");
+    if (!fp) {
+        printf("Unable to open patient data file\n");
+        return 0;
+    }
+
+    Patient patient;
+    int found = 0;
+    printf("\n==== Patients Found by Name ====\n");
+    printf("%-5s %-20s %-5s %-8s %-15s %-20s\n", "ID", "Name", "Age", "Gender", "Phone", "Primary Doctor");
+    printf("------------------------------------------------------------------------\n");
+
+    while (fscanf(fp, "%d,%49[^,],%d,%c,%14[^,],%99[^,],%49[^,],%4[^,],%199[^,],%14[^,],%49[^\n]",
+                  &patient.patientId, patient.name, &patient.age, &patient.gender,
+                  patient.phone, patient.address, patient.email, patient.bloodType,
+                  patient.allergies, patient.emergencyContact, patient.primaryDoctor) >= 5) {
+
+        // Case-insensitive name comparison
+        char nameLower[50], searchLower[50];
+        strcpy(nameLower, patient.name);
+        strcpy(searchLower, name);
+
+        for (int i = 0; nameLower[i]; i++)
+            nameLower[i] = tolower((int)nameLower[i]);
+        for (int i = 0; searchLower[i]; i++)
+            searchLower[i] = tolower((int)searchLower[i]);
+
+        if (strstr(nameLower, searchLower)) {
+            printf("%-5d %-20s %-5d %-8s %-15s %-20s\n",
+                   patient.patientId, patient.name, patient.age,
+                   patient.gender == 'M' ? "Male" : "Female", patient.phone, patient.primaryDoctor);
+            found = 1;
+        }
+    }
+
+    fclose(fp);
+
+    if (found) {
+        printf("\nMultiple patients found. Please use ID or provide phone number for exact match.\n");
+    }
+
+    return found;
+}
 void initializeMaxPatientId() {
     if (isMaxPatientIdInitialized) return;
 
@@ -185,60 +263,6 @@ Patient makePatient() {
     return patient;
 }
 
-Patient findPatient(const int searchType, const char* searchValue) {
-    Patient patient = {0};
-    FILE *fp = fopen(PATIENT_DATAFILE, "r");
-    if (!fp) {
-        printf("Unable to open patient data file\n");
-        return patient;
-    }
-
-    while (fscanf(fp, "%d,%49[^,],%d,%c,%14[^,],%99[^,],%49[^,],%4[^,],%199[^,],%14[^,],%49[^\n]",
-                  &patient.patientId, patient.name, &patient.age, &patient.gender,
-                  patient.phone, patient.address, patient.email, patient.bloodType,
-                  patient.allergies, patient.emergencyContact, patient.primaryDoctor) >= 5) {
-
-        int found = 0;
-        switch(searchType) {
-            case 1: // Phone
-                if (strcmp(patient.phone, searchValue) == 0) {
-                    found = 1;
-                }
-                break;
-            case 2: // Name (case-insensitive partial match)
-                {
-                    char nameLower[50], searchLower[50];
-                    strcpy(nameLower, patient.name);
-                    strcpy(searchLower, searchValue);
-
-                    for (int i = 0; nameLower[i]; i++)
-                        nameLower[i] = tolower((int)nameLower[i]);
-                    for (int i = 0; searchLower[i]; i++)
-                        searchLower[i] = tolower((int)searchLower[i]);
-
-                    if (strstr(nameLower, searchLower)) {
-                        found = 1;
-                    }
-                }
-                break;
-            case 3: // ID
-                if (patient.patientId == atoi(searchValue)) {
-                    found = 1;
-                }
-                break;
-            default:
-                ;
-        }
-
-        if (found) {
-            fclose(fp);
-            return patient;
-        }
-    }
-    fclose(fp);
-    patient.patientId = 0; // Not found
-    return patient;
-}
 
 void showPatient(Patient* patient) {
     printf("\n==== Patient Details ====\n");
@@ -384,7 +408,7 @@ void editPatient(const int patientId, Patient* patient) {
 void deletePatient(const int patientId) {
     char patientIdStr[10];
     sprintf(patientIdStr, "%d", patientId);
-    Patient patient = findPatient(3, patientIdStr);
+    Patient patient = findPatientBySearch(1, patientIdStr, NULL);
 
     if (patient.patientId == 0) {
         printf("Patient with ID %d not found.\n", patientId);
@@ -445,40 +469,127 @@ void deletePatient(const int patientId) {
     getchar();
 }
 
-void searchPatient() {
-    char searchName[50];
-    printf("Enter patient name to search: ");
-    fgets(searchName, sizeof(searchName), stdin);
-    stripPatientNewline(searchName);
-
+Patient findPatientBySearch(int searchType, const char* value1, const char* value2) {
+    Patient patient = {0};
     FILE *fp = fopen(PATIENT_DATAFILE, "r");
     if (!fp) {
-        printf("No patient data file found.\n");
-        printf("Press Enter to return to menu...");
-        getchar();
-        return;
+        return patient;
     }
 
-    Patient patient;
-    int found = 0;
-    printf("\n==== Search Results ====\n");
-
+    Patient currentPatient;
     while (fscanf(fp, "%d,%49[^,],%d,%c,%14[^,],%99[^,],%49[^,],%4[^,],%199[^,],%14[^,],%49[^\n]",
-                  &patient.patientId, patient.name, &patient.age, &patient.gender,
-                  patient.phone, patient.address, patient.email, patient.bloodType,
-                  patient.allergies, patient.emergencyContact, patient.primaryDoctor) >= 5) {
-        if (strstr(patient.name, searchName) != NULL) {
+                  &currentPatient.patientId, currentPatient.name, &currentPatient.age, &currentPatient.gender,
+                  currentPatient.phone, currentPatient.address, currentPatient.email, currentPatient.bloodType,
+                  currentPatient.allergies, currentPatient.emergencyContact, currentPatient.primaryDoctor) >= 5) {
+
+        switch (searchType) {
+            case 1: // Search by ID
+                if (currentPatient.patientId == atoi(value1)) {
+                    fclose(fp);
+                    return currentPatient;
+                }
+                break;
+            case 2: // Search by phone only
+                if (strcmp(currentPatient.phone, value1) == 0) {
+                    fclose(fp);
+                    return currentPatient;
+                }
+                break;
+            case 3: // Search by name AND phone (both must match)
+                if (value2 != NULL) {
+                    // Case-insensitive name comparison
+                    char nameLower[50], searchLower[50];
+                    strcpy(nameLower, currentPatient.name);
+                    strcpy(searchLower, value1);
+
+                    for (int i = 0; nameLower[i]; i++)
+                        nameLower[i] = tolower((int)nameLower[i]);
+                    for (int i = 0; searchLower[i]; i++)
+                        searchLower[i] = tolower((int)searchLower[i]);
+
+                    if (strstr(nameLower, searchLower) && strcmp(currentPatient.phone, value2) == 0) {
+                        fclose(fp);
+                        return currentPatient;
+                    }
+                    break;
+                }
+            default:
+                ;
+        }
+    }
+
+    fclose(fp);
+    return patient; // Return empty patient if not found
+}
+
+void searchPatient() {
+    char searchValue[100];
+    char phoneValue[20];
+    Patient patient = {0};
+    int found = 0;
+
+    printf("\n==== Search Patient ====\n");
+    printf("Enter Patient ID (or press Enter to search by name/phone): ");
+    fgets(searchValue, sizeof(searchValue), stdin);
+    searchValue[strcspn(searchValue, "\n")] = 0;
+
+    // First try to search by ID if a number is provided
+    if (!isPatientEffectivelyEmpty(searchValue) && atoi(searchValue) > 0) {
+        patient = findPatientBySearch(1, searchValue, NULL); // Search by ID
+        if (patient.patientId != 0) {
+            printf("\n==== Patient Found by ID ====\n");
             showPatient(&patient);
             found = 1;
         }
     }
 
+    // If not found by ID or no ID provided, search by name AND phone
     if (!found) {
-        printf("No patients found matching '%s'.\n", searchName);
+        printf("Enter Patient Name: ");
+        fgets(searchValue, sizeof(searchValue), stdin);
+        searchValue[strcspn(searchValue, "\n")] = 0;
+
+        if (!isPatientEffectivelyEmpty(searchValue)) {
+            printf("Enter Phone Number: ");
+            fgets(phoneValue, sizeof(phoneValue), stdin);
+            phoneValue[strcspn(phoneValue, "\n")] = 0;
+
+            if (!isPatientEffectivelyEmpty(phoneValue)) {
+                // Search by both name and phone (both must match)
+                patient = findPatientBySearch(3, searchValue, phoneValue);
+                if (patient.patientId != 0) {
+                    printf("\n==== Patient Found by Name and Phone ====\n");
+                    showPatient(&patient);
+                    found = 1;
+                }
+            } else {
+                // Search by name only and show all matches
+                found = searchAndShowPatientsByName(searchValue);
+            }
+        }
     }
 
-    fclose(fp);
-    printf("Press Enter to return to menu...");
+    // If still not found, search by phone only
+    if (!found) {
+        printf("Enter Phone Number: ");
+        fgets(searchValue, sizeof(searchValue), stdin);
+        searchValue[strcspn(searchValue, "\n")] = 0;
+
+        if (!isPatientEffectivelyEmpty(searchValue)) {
+            patient = findPatientBySearch(2, searchValue, NULL); // Search by phone
+            if (patient.patientId != 0) {
+                printf("\n==== Patient Found by Phone ====\n");
+                showPatient(&patient);
+                found = 1;
+            }
+        }
+    }
+
+    if (!found) {
+        printf("No patient found with the provided information.\n");
+    }
+
+    printf("\nPress Enter to return to menu...");
     getchar();
 }
 
@@ -494,9 +605,7 @@ void patientInformationLookup() {
         printf("3. List All Patients\n");
         printf("4. Edit Patient\n");
         printf("5. Delete Patient\n");
-        printf("6. Search by ID\n");
-        printf("7. Search by Phone\n");
-        printf("8. Back to Main Menu\n");
+        printf("6. Back to Main Menu\n");
         printf("\nChoice: ");
 
         if (scanf("%d", &choice) != 1) {
@@ -529,7 +638,7 @@ void patientInformationLookup() {
 
                 char patientIdStr[10];
                 sprintf(patientIdStr, "%d", patientId);
-                Patient patient = findPatient(3, patientIdStr);
+                Patient patient = findPatientBySearch(3, patientIdStr, NULL);
 
                 if (patient.patientId == 0) {
                     printf("Patient with ID %d not found.\n", patientId);
@@ -548,41 +657,7 @@ void patientInformationLookup() {
                 deletePatient(patientId);
                 break;
             }
-            case 6: {
-                char patientId[10];
-                printf("Enter Patient ID: ");
-                scanf("%s", patientId);
-                getchar();
-                Patient patient = findPatient(3, patientId);
-                if (patient.patientId != 0) {
-                    showPatient(&patient);
-                    printf("Press Enter to return to menu...");
-                    getchar();
-                } else {
-                    printf("Patient not found!\n");
-                    printf("Press Enter to return to menu...");
-                    getchar();
-                }
-                break;
-            }
-            case 7: {
-                char phone[15];
-                printf("Enter Phone Number: ");
-                scanf("%s", phone);
-                getchar();
-                Patient patient = findPatient(1, phone);
-                if (patient.patientId != 0) {
-                    showPatient(&patient);
-                    printf("Press Enter to return to menu...");
-                    getchar();
-                } else {
-                    printf("Patient not found!\n");
-                    printf("Press Enter to return to menu...");
-                    getchar();
-                }
-                break;
-            }
-            case 8:
+            case 6:
                 return;
             default:
                 printf("Invalid choice. Press Enter to continue...");

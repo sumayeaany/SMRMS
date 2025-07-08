@@ -18,8 +18,8 @@ typedef struct {
 // Function declarations
 void patientInformationLookup();
 Patient makePatient();
+Patient findPatientBySearch(int searchType, const char* value1, const char* value2);
 void makePatientEntry(Patient* patient);
-Patient findPatient(const int searchType, const char* searchValue);
 void showPatient(Patient* patient);
 void listAllPatients();
 void editPatient(const int patientId, Patient* patient);
@@ -27,5 +27,7 @@ void deletePatient(const int patientId);
 void searchPatient();
 int generatePatientId();
 void initializeMaxPatientId();
+Patient findPatientByNameAndPhone(const char* name, const char* phone);
+int searchAndShowPatientsByName(const char* name);
 
 #endif
