@@ -293,6 +293,68 @@ void listAllAppointments() {
     fclose(fp);
 }
 
+void markAppointmentAsComplete(const int appointmentId) {
+    FILE *fp = fopen(APPOINTMENT_DATAFILE, "r");
+    if (!fp) {
+        perror("Unable to open appointment data file");
+        return;
+    }
+
+    FILE *temp = fopen("data/temp_appointment.csv", "w");
+    if (!temp) {
+        perror("Unable to create temporary file");
+        fclose(fp);
+        return;
+    }
+
+    char line[512];
+    int found = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        char lineCopy[512];
+        strcpy(lineCopy, line);
+
+        const char* id_str = strtok(lineCopy, ",");
+        if (id_str == NULL) continue;
+
+        const int currentId = atoi(id_str);
+
+        if (currentId == appointmentId) {
+            found = 1;
+            // Reconstruct the line with the new status
+            char* patientId_str = strtok(NULL, ",");
+            char* doctorName_str = strtok(NULL, ",");
+            char* date_str = strtok(NULL, ",");
+            char* time_str = strtok(NULL, ",");
+            char* purpose_str = strtok(NULL, ",");
+            // The original status is ignored
+
+            fprintf(temp, "%d,%s,%s,%s,%s,%s,%s\n",
+                    currentId,
+                    patientId_str ? patientId_str : "0",
+                    doctorName_str ? doctorName_str : "N/A",
+                    date_str ? date_str : "N/A",
+                    time_str ? time_str : "N/A",
+                    purpose_str ? purpose_str : "N/A",
+                    "Completed");
+        } else {
+            fputs(line, temp);
+        }
+    }
+
+    fclose(fp);
+    fclose(temp);
+
+    if (found) {
+        remove(APPOINTMENT_DATAFILE);
+        rename("data/temp_appointment.csv", APPOINTMENT_DATAFILE);
+        printf("Appointment ID %d marked as complete.\n", appointmentId);
+    } else {
+        remove("data/temp_appointment.csv");
+        printf("Appointment ID %d not found.\n", appointmentId);
+    }
+}
+
 void editAppointment(const int appointmentId, Appointment* appointment) {
     char prompt[256], input[256];
 
@@ -433,10 +495,11 @@ void appointmentInformationLookup() {
         printf("\n==== Doctor Appointment Management ====\n");
         printf("1. Schedule New Appointment\n");
         printf("2. Search Appointment by ID\n");
-        printf("3. View All Appointments\n");
+        printf("3. Complete Appointment\n");
         printf("4. Edit Appointment\n");
         printf("5. Cancel Appointment\n");
-        printf("6. Return to Main Menu\n");
+        printf("6. List all Appointments\n");
+        printf("7. Retutn to Previous Menu\n");
         printf("\nChoice: ");
         fflush(stdout);
 
@@ -469,7 +532,19 @@ void appointmentInformationLookup() {
                 break;
             }
             case 3:
-                listAllAppointments();
+                int id;
+                printf("\nEnter appointment ID: ");
+                scanf("%d", &id);
+                while (getchar() != '\n') {}
+
+                Appointment appointment = findAppointment(id);
+                if (appointment.appointmentId)
+                    markAppointmentAsComplete(id);
+                else {
+                    printf("Appointment not found!\n");
+                    printf("Press Enter to return to menu...");
+                    getchar();
+                }
                 break;
             case 4: {
                 int id;
@@ -504,6 +579,9 @@ void appointmentInformationLookup() {
                 break;
             }
             case 6:
+                listAllAppointments();
+                break;
+            case 7:
                 return;
             default:
                 printf("Invalid choice. Please try again.\n");

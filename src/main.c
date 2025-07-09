@@ -8,13 +8,13 @@
 #include "auth.h"
 #include "prescription.h"
 int main() {
-    system("cls");
-
-    createDefaultUser();
-
-    if (!loginScreen()) {
-        return 1;
-    }
+    // system("cls");
+    //
+    // createDefaultUser();
+    //
+    // if (!loginScreen()) {
+    //     return 1;
+    // }
 
     int choice;
 
