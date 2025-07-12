@@ -320,65 +320,53 @@ void generateBillingReport() {
     printf("-------------------------------------\n\n");
     printf("Itemized Bill:\n");
     printf("--------------------------------------------------------------------------\n");
-    printf("%-30s %-20s %15s\n", "Description", "Date/Time", "Cost (USD)");
+    printf("%-30s %-20s %15s\n", "Description", "Date/Time", "Cost (BDT)");
     printf("--------------------------------------------------------------------------\n");
 
-   printf("APPOINTMENT HISTORY:\n");
-    FILE *appFp = fopen("data/appointment.csv", "r");
-    int appointmentCount = 0;
+    // 1. Calculate Appointment Charges
+    FILE *appFp = fopen(APPOINTMENT_DATAFILE, "r");
     if (appFp) {
         char line[512];
         while (fgets(line, sizeof(line), appFp)) {
             int appId, appPatientId;
-            char doctorName[50], date[20], time[10], purpose[100], status[20];
-
-            if (sscanf(line, "%d,%d,%49[^,],%19[^,],%9[^,],%99[^,],%19[^\n]",
-                       &appId, &appPatientId, doctorName, date, time, purpose, status) >= 6) {
+            char doctorName[50], date[20], time[10];
+            if (sscanf(line, "%d,%d,%49[^,],%19[^,],%9[^,]", &appId, &appPatientId, doctorName, date, time) >= 5) {
                 if (appPatientId == patientId) {
-                    printf("- Date: %s, Time: %s, Doctor: %s\n", date, time, doctorName);
-                    printf("  Purpose: %s, Status: %s\n", purpose, status);
-                    appointmentCount++;
+                    char description[100];
+                    snprintf(description, sizeof(description), "Appointment (Dr. %s)", doctorName);
+                    char dateTime[30];
+                    snprintf(dateTime, sizeof(dateTime), "%s %s", date, time);
+                    printf("%-30s %-20s %15.2f\n", description, dateTime, APPOINTMENT_FEE);
+                    appointmentCharges += APPOINTMENT_FEE;
                 }
             }
         }
         fclose(appFp);
     }
-    if (appointmentCount == 0) {
-        printf("No appointments found.\n");
-    }
-    printf("\n");
 
-    // Prescriptions
-    printf("PRESCRIPTION HISTORY:\n");
-    FILE *prescFp = fopen("data/prescription.csv", "r");
-    int prescriptionCount = 0;
+    // 2. Calculate Prescription Medicine Charges
+    FILE *prescFp = fopen(PRESCRIPTION_DATAFILE, "r");
     if (prescFp) {
-        char line[512];
-        while (fgets(line, sizeof(line), prescFp)) {
-            int prescId, prescPatientId, medicineId;
-            char doctorName[50], date[20], medicineName[50], dosage[50], instructions[200];
-
-            // Read prescription format: prescId,patientId,doctorName,date,medicineId,medicineName,dosage,instructions
-            if (sscanf(line, "%d,%d,%49[^,],%19[^,],%d,%49[^,],%49[^,],%199[^\n]",
-                       &prescId, &prescPatientId, doctorName, date, &medicineId,
-                       medicineName, dosage, instructions) >= 7) {
-                if (prescPatientId == patientId) {
-                    printf("- Date: %s, Doctor: %s\n", date, doctorName);
-                    printf("  Medicine: %s, Dosage: %s\n", medicineName, dosage);
-                    printf("  Instructions: %s\n", instructions);
-                    prescriptionCount++;
-                }
+        Prescription p;
+        while (fscanf(prescFp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%*s",
+                      &p.prescriptionId, &p.patientId, &p.medicineId, p.medicineName,
+                      &p.quantity, &p.unitPrice, &p.totalPrice, p.prescribedDate) == 8) {
+            if (p.patientId == patientId) {
+                char description[100];
+                snprintf(description, sizeof(description), "Prescription: %s (x%d)", p.medicineName, p.quantity);
+                printf("%-30s %-20s %15.2f\n", description, p.prescribedDate, p.totalPrice);
+                medicineCharges += p.totalPrice;
             }
+            // Skip rest of the line
+            int c;
+            while ((c = fgetc(prescFp)) != '\n' && c != EOF);
         }
         fclose(prescFp);
     }
-    if (prescriptionCount == 0) {
-        printf("No prescriptions found.\n");
-    }
-    printf("\n");
 
-    // 2. Calculate Emergency Visit and Medicine Charges
-    FILE *emergFp = fopen(EMERGENCY_DATAFILE, "r"); // FIX: Corrected filename
+
+    // 3. Calculate Emergency Visit and Medicine Charges
+    FILE *emergFp = fopen(EMERGENCY_DATAFILE, "r");
     if (emergFp) {
         char line[1024];
         while (fgets(line, sizeof(line), emergFp)) {
@@ -386,14 +374,12 @@ void generateBillingReport() {
             char arrivalDate[20];
             if (sscanf(line, "%d,%d,%*[^,],%*[^,],%*[^,],%*d,%19[^,]", &emergId, &emergPatientId, arrivalDate) == 3) {
                 if (emergPatientId == patientId) {
-                    // Add base fee for the emergency visit
                     char description[100];
                     snprintf(description, sizeof(description), "Emergency Visit (ID: %d)", emergId);
                     printf("%-30s %-20s %15.2f\n", description, arrivalDate, EMERGENCY_BASE_FEE);
                     emergencyCharges += EMERGENCY_BASE_FEE;
 
-                    // Now find associated medicines for this emergency ID
-                    FILE *medFp = fopen(EMERGENCY_MEDICINES_FILE, "r"); // FIX: Corrected filename
+                    FILE *medFp = fopen(EMERGENCY_MEDICINES_FILE, "r");
                     if (medFp) {
                         char medLine[256];
                         while (fgets(medLine, sizeof(medLine), medFp)) {
@@ -404,8 +390,8 @@ void generateBillingReport() {
                                     if (medInfo.medicineId != 0) {
                                         double cost = medInfo.price * medQty;
                                         char medDescription[100];
-                                        snprintf(medDescription, sizeof(medDescription), "Medicine: %s (x%d)", medInfo.name, medQty);
-                                        printf("  %-28s %-20s %15.2f\n", medDescription, arrivalDate, cost);
+                                        snprintf(medDescription, sizeof(medDescription), "  Medicine: %s (x%d)", medInfo.name, medQty);
+                                        printf("%-30s %-20s %15.2f\n", medDescription, arrivalDate, cost);
                                         medicineCharges += cost;
                                     }
                                 }
@@ -426,7 +412,7 @@ void generateBillingReport() {
     printf("%52s %15.2f\n", "Subtotal Emergency Visits:", emergencyCharges);
     printf("%52s %15.2f\n", "Subtotal Medicines:", medicineCharges);
     printf("--------------------------------------------------------------------------\n");
-    printf("%52s $%14.2f\n", "TOTAL DUE:", totalBill);
+    printf("%52s Tk.%14.2f\n", "TOTAL DUE:", totalBill);
     printf("--------------------------------------------------------------------------\n");
 
     printf("\nPress Enter to return to menu...");
