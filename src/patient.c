@@ -633,12 +633,18 @@ void patientInformationLookup() {
             case 4: {
                 int patientId;
                 printf("Enter Patient ID to edit: ");
-                scanf("%d", &patientId);
+                if (scanf("%d", &patientId) != 1) {
+                    while (getchar() != '\n'); // Clear buffer
+                    printf("Invalid input.\n");
+                    printf("Press Enter to continue...");
+                    getchar();
+                    break;
+                }
                 getchar();
 
                 char patientIdStr[10];
                 sprintf(patientIdStr, "%d", patientId);
-                Patient patient = findPatientBySearch(3, patientIdStr, NULL);
+                Patient patient = findPatientBySearch(1, patientIdStr, NULL); // Search by ID
 
                 if (patient.patientId == 0) {
                     printf("Patient with ID %d not found.\n", patientId);
@@ -652,7 +658,13 @@ void patientInformationLookup() {
             case 5: {
                 int patientId;
                 printf("Enter Patient ID to delete: ");
-                scanf("%d", &patientId);
+                if (scanf("%d", &patientId) != 1) {
+                    while (getchar() != '\n'); // Clear buffer
+                    printf("Invalid input.\n");
+                    printf("Press Enter to continue...");
+                    getchar();
+                    break;
+                }
                 getchar();
                 deletePatient(patientId);
                 break;

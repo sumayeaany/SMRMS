@@ -46,7 +46,8 @@ void generatePrescriptionReport();
 void generateBillingReport();
 void viewAllReports();
 void deleteReport();
-
+static void printEmergencyHistory(int patientId, FILE* reportFp);
+static void printPrescriptionHistory(int patientId, FILE* reportFp);;
 // Billing functions
 void billingManagement();
 void generatePatientBill();
