@@ -372,7 +372,7 @@ void generateBillingReport() {
         while (fgets(line, sizeof(line), emergFp)) {
             int emergId, emergPatientId;
             char arrivalDate[20];
-            if (sscanf(line, "%d,%d,%*[^,],%*[^,],%*[^,],%*d,%19[^,]", &emergId, &emergPatientId, arrivalDate) == 3) {
+            if (sscanf(line, "%d,%d,%*[^,],%*[^,],%*[^,],%*[^,],%19[^,]", &emergId, &emergPatientId, arrivalDate) == 3) {
                 if (emergPatientId == patientId) {
                     char description[100];
                     snprintf(description, sizeof(description), "Emergency Visit (ID: %d)", emergId);
