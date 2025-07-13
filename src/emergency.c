@@ -9,11 +9,17 @@
 #include "medicine.h"
 
 #define EMERGENCY_DATAFILE "data/emergency.csv"
+#define EMERGENCY_MEDICINE_DATAFILE "data/emergency_medicines.csv"
 
 static EmergencyQueue emergencyQueue;
 static int maxEmergencyId = 5000;
 static int isQueueInitialized = 0;
 
+static int tempPatientIdCounter = -1;
+
+int generateTempPatientId() {
+    return tempPatientIdCounter--;
+}
 // Helper function to check if a string is effectively empty
 static int isEmergencyEffectivelyEmpty(const char* str) {
     if (!str) return 1;
@@ -221,23 +227,87 @@ EmergencyPatient createEmergencyEntry() {
 }
 
 void addPatientToEmergencyQueue() {
-    EmergencyPatient patient = createEmergencyEntry();
-
-    if (patient.emergencyId == -1) {
-        printf("Failed to create emergency entry.\n");
+    if (isEmergencyQueueFull()) {
+        printf("\nEmergency queue is full. Cannot add more patients.\n");
         printf("Press Enter to continue...");
         getchar();
         return;
     }
 
-    enqueueEmergencyPatient(patient);
-    saveEmergencyRecord(&patient);
+    EmergencyPatient newPatient = {0};
+    char buffer[256];
+    int patientId = 0;
+    Patient existingPatient = {0};
 
-    printf("\nPatient added to emergency queue successfully!\n");
-    printf("Emergency ID: %d\n", patient.emergencyId);
-    printf("Priority: %s\n", getPriorityString(patient.priority));
-    printf("Current queue position: Based on priority\n");
+    printf("\n==== Add New Emergency Patient ====\n");
+    printf("Is the patient already registered? (y/n): ");
+    char choice;
+    scanf(" %c", &choice);
+    getchar();
 
+    if (choice == 'y' || choice == 'Y') {
+        printf("Enter Patient ID: ");
+        if (scanf("%d", &patientId) != 1) {
+            while (getchar() != '\n'); // Clear buffer
+            printf("Invalid Patient ID.\n");
+            return;
+        }
+        getchar();
+
+        // Convert patientId to string for searching
+        char patientIdStr[20];
+        sprintf(patientIdStr, "%d", patientId);
+
+        // Correctly call findPatientBySearch with a string
+        existingPatient = findPatientBySearch(1, patientIdStr, NULL); // 1 for search by ID
+
+        if (existingPatient.patientId == 0) {
+            printf("Patient with ID %d not found in the system.\n", patientId);
+            printf("Proceeding with manual entry.\n");
+            patientId = 0; // Reset patientId to indicate not found
+        } else {
+            printf("Patient Found: %s\n", existingPatient.name);
+            newPatient.patientId = existingPatient.patientId;
+            strncpy(newPatient.patientName, existingPatient.name, sizeof(newPatient.patientName) - 1);
+            strncpy(newPatient.patientPhone, existingPatient.phone, sizeof(newPatient.patientPhone) - 1);
+        }
+    }
+
+    if (patientId == 0) {
+        getEmergencyInput("Patient Name: ", newPatient.patientName, sizeof(newPatient.patientName));
+        getEmergencyInput("Patient Phone: ", newPatient.patientPhone, sizeof(newPatient.patientPhone));
+        newPatient.patientId = generateTempPatientId();
+        printf("Assigned temporary Patient ID: %d\n", newPatient.patientId);
+    }
+
+    getEmergencyInput("Symptoms: ", newPatient.symptoms, sizeof(newPatient.symptoms));
+
+    printf("Enter Priority (1-CRITICAL, 2-HIGH, 3-MEDIUM, 4-LOW): ");
+    int priority;
+    if (scanf("%d", &priority) != 1 || priority < 1 || priority > 4) {
+        printf("Invalid priority. Defaulting to MEDIUM.\n");
+        newPatient.priority = MEDIUM;
+    } else {
+        newPatient.priority = (EmergencyPriority)priority;
+    }
+    getchar();
+
+    // Set arrival time and status
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(newPatient.arrivalDate, sizeof(newPatient.arrivalDate), "%d/%m/%Y", t);
+    strftime(newPatient.arrivalTime, sizeof(newPatient.arrivalTime), "%H:%M", t);
+    strcpy(newPatient.status, "Waiting");
+    strcpy(newPatient.treatingDoctor, "N/A");
+    strcpy(newPatient.treatment, "N/A");
+    strcpy(newPatient.dischargeTime, "N/A");
+    strcpy(newPatient.notes, "N/A");
+
+    newPatient.emergencyId = generateEmergencyId();
+    enqueueEmergencyPatient(newPatient);
+    saveEmergencyRecord(&newPatient);
+
+    printf("\nPatient added to emergency queue with ID %d.\n", newPatient.emergencyId);
     printf("Press Enter to continue...");
     getchar();
 }
@@ -366,7 +436,13 @@ void addMedicineToTreatment(EmergencyPatient* patient) {
 void dischargePatient() {
     int emergencyId;
     printf("Enter Emergency ID to discharge: ");
-    scanf("%d", &emergencyId);
+    if (scanf("%d", &emergencyId) != 1) {
+        while (getchar() != '\n'); // Clear buffer
+        printf("Invalid input.\n");
+        printf("Press Enter to continue...");
+        getchar();
+        return;
+    }
     getchar();
 
     FILE *fp = fopen("data/emergency_records.csv", "r");
@@ -377,25 +453,29 @@ void dischargePatient() {
         return;
     }
 
-    char emergencyLine[500];
+    char emergencyLine[512];
     int found = 0;
-    int emergPatientId, priority;
+    int lineEmergencyId, emergPatientId, priority;
     char patientName[50], phoneNumber[20], symptoms[200], arrivalDate[20], arrivalTime[10];
-    char status[20], assignedDoctor[50], treatment[200];
+    char status[20], assignedDoctor[50], treatment[200], notes[200];
 
     while (fgets(emergencyLine, sizeof(emergencyLine), fp)) {
-        char notes[200];
-        if (sscanf(emergencyLine, "%d,%d,%49[^,],%19[^,],%199[^,],%d,%19[^,],%9[^,],%19[^,],%49[^,],%199[^,],%199[^\n]",
-                   &emergencyId, &emergPatientId, patientName, phoneNumber, symptoms, &priority,
-                   arrivalDate, arrivalTime, status, assignedDoctor, treatment, notes) == 12) {
-            found = 1;
-            break;
+        // Use a temporary variable for the ID from the current line
+        int currentId;
+        if (sscanf(emergencyLine, "%d,", &currentId) == 1 && currentId == emergencyId) {
+            // If the ID matches, parse the rest of the line
+            if (sscanf(emergencyLine, "%d,%d,%49[^,],%19[^,],%199[^,],%d,%19[^,],%9[^,],%19[^,],%49[^,],%199[^,],%199[^\n]",
+                       &lineEmergencyId, &emergPatientId, patientName, phoneNumber, symptoms, &priority,
+                       arrivalDate, arrivalTime, status, assignedDoctor, treatment, notes) == 12) {
+                found = 1;
+                break;
+            }
         }
     }
     fclose(fp);
 
     if (!found) {
-        printf("Emergency record not found!\n");
+        printf("Emergency record with ID %d not found!\n", emergencyId);
         printf("Press Enter to return to menu...");
         getchar();
         return;
@@ -411,7 +491,7 @@ void dischargePatient() {
     // Check if patient exists in main system using existing findPatient function
     char patientIdStr[10];
     sprintf(patientIdStr, "%d", emergPatientId);
-    Patient existingPatient = findPatientBySearch(3, patientIdStr, NULL); // Search by ID
+    Patient existingPatient = findPatientBySearch(1, patientIdStr, NULL); // Search by ID
     int patientAdded = 0;
 
     if (existingPatient.patientId == 0) {
@@ -523,7 +603,7 @@ void dischargePatient() {
         return;
     }
 
-    char line[500];
+    char line[512];
     while (fgets(line, sizeof(line), fp)) {
         int lineEmergencyId;
         if (sscanf(line, "%d,", &lineEmergencyId) == 1 && lineEmergencyId == emergencyId) {
@@ -578,7 +658,7 @@ void dischargePatient() {
         appointment.patientId = emergPatientId;
         strcpy(appointment.doctorName, appointmentDoctor);
         strcpy(appointment.date, appointmentDate);
-        strcpy(appointment.date, appointmentTime);
+        strcpy(appointment.time, appointmentTime);
         strcpy(appointment.purpose, appointmentPurpose);
         strcpy(appointment.status, "Scheduled");
 
@@ -588,7 +668,7 @@ void dischargePatient() {
             fprintf(appointmentFp, "%d,%d,%s,%s,%s,%s,%s\n",
                     appointment.appointmentId, appointment.patientId,
                     appointment.doctorName, appointment.date,
-                    appointment.date, appointment.purpose,
+                    appointment.time, appointment.purpose,
                     appointment.status);
             fclose(appointmentFp);
 
@@ -668,26 +748,75 @@ void showEmergencyPatient(EmergencyPatient* patient) {
 }
 
 void saveEmergencyRecord(EmergencyPatient* patient) {
-    FILE *fp = fopen(EMERGENCY_DATAFILE, "a");
-    if (!fp) {
-        fp = fopen(EMERGENCY_DATAFILE, "w");
-        if (!fp) {
-            perror("Unable to create emergency data file");
-            return;
-        }
-        fclose(fp);
-        fp = fopen(EMERGENCY_DATAFILE, "a");
+    // Part 1: Save/Update the main emergency record in emergency_records.csv
+    FILE *fp = fopen(EMERGENCY_DATAFILE, "r");
+    FILE *tempFp = fopen("data/emergency_temp.csv", "w");
+
+    if (!tempFp) {
+        perror("Unable to create temporary emergency file");
+        if (fp) fclose(fp);
+        return;
     }
 
-    // Save basic emergency record
-    fprintf(fp, "%d,%d,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s\n",
-            patient->emergencyId, patient->patientId, patient->patientName,
-            patient->patientPhone, patient->symptoms, patient->priority,
-            patient->arrivalDate, patient->arrivalTime, patient->status,
-            patient->treatingDoctor, patient->treatment, patient->dischargeTime,
-            patient->notes);
+    int recordExists = 0;
+    if (fp) {
+        char line[1024];
+        while (fgets(line, sizeof(line), fp)) {
+            int currentId;
+            if (sscanf(line, "%d,", &currentId) == 1 && currentId == patient->emergencyId) {
+                // This is the record to update, so write the new data
+                fprintf(tempFp, "%d,%d,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s\n",
+                        patient->emergencyId, patient->patientId, patient->patientName,
+                        patient->patientPhone, patient->symptoms, patient->priority,
+                        patient->arrivalDate, patient->arrivalTime, patient->status,
+                        patient->treatingDoctor, patient->treatment, patient->dischargeTime,
+                        patient->notes);
+                recordExists = 1;
+            } else {
+                // Copy other lines as they are
+                fputs(line, tempFp);
+            }
+        }
+        fclose(fp);
+    }
 
-    fclose(fp);
+    // If the record was not found in the file, append it
+    if (!recordExists) {
+        fprintf(tempFp, "%d,%d,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s\n",
+                patient->emergencyId, patient->patientId, patient->patientName,
+                patient->patientPhone, patient->symptoms, patient->priority,
+                patient->arrivalDate, patient->arrivalTime, patient->status,
+                patient->treatingDoctor, patient->treatment, patient->dischargeTime,
+                patient->notes);
+    }
+
+    fclose(tempFp);
+
+    // Replace the old file with the updated one
+    remove(EMERGENCY_DATAFILE);
+    rename("data/emergency_temp.csv", EMERGENCY_DATAFILE);
+
+
+    // Part 2: Save the medicine records to emergency_medicine.csv
+    if (patient->medicineCount > 0) {
+        FILE *medFp = fopen(EMERGENCY_MEDICINE_DATAFILE, "a");
+        if (!medFp) {
+            perror("Unable to open emergency medicine data file");
+            return;
+        }
+
+        for (int i = 0; i < patient->medicineCount; i++) {
+            EmergencyMedicine *med = &patient->medicines[i];
+            fprintf(medFp, "%d,%d,%s,%d,%s,%s\n",
+                    patient->emergencyId,
+                    med->medicineId,
+                    med->medicineName,
+                    med->quantity,
+                    med->dosage,
+                    med->instructions);
+        }
+        fclose(medFp);
+    }
 }
 
 void emergencyPatientQueue() {

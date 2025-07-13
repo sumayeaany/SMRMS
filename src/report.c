@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 #include "report.h"
+
+#include "medicine.h"
 #include "patient.h"
 #include "prescription.h"
 
@@ -10,17 +12,50 @@
 #define PRESCRIPTION_DATAFILE "data/prescription.csv"
 #define BILL_DATAFILE "data/bills.csv"
 #define EMERGENCY_DATAFILE "data/emergency.csv"
+#define EMERGENCY_MEDICINES_FILE "data/emergency_medicines.csv"
+#define APPOINTMENT_DATAFILE "data/appointment.csv"
 
 static int maxReportId = 3000;
 static int maxBillId = 5000;
 
-// Helper functions
-static void createDataDirectory() {
-    #ifdef _WIN32
-        system("if not exist data mkdir data");
-    #else
+#define APPOINTMENT_FEE 500.00
+#define EMERGENCY_BASE_FEE 200.00
 
+// Helper functions
+static void createReportsDirectory() {
+    #ifdef _WIN32
+        system("if not exist reports mkdir reports");
+    #else
+        system("mkdir -p reports");
     #endif
+}
+void initializeDataFiles() {
+    // Create data directory if it doesn't exist
+#ifdef _WIN32
+    system("if not exist data mkdir data");
+#else
+    system("mkdir -p data");
+#endif
+
+    // List of all data files used in the application
+    const char* dataFiles[] = {
+        APPOINTMENT_DATAFILE,
+        REPORT_DATAFILE,
+        PRESCRIPTION_DATAFILE,
+        BILL_DATAFILE,
+        EMERGENCY_DATAFILE,
+        EMERGENCY_MEDICINES_FILE
+    };
+    int numFiles = sizeof(dataFiles) / sizeof(dataFiles[0]);
+
+    for (int i = 0; i < numFiles; ++i) {
+        FILE *fp = fopen(dataFiles[i], "a"); // Open in append mode to create if not exists
+        if (fp) {
+            fclose(fp);
+        } else {
+            printf("Warning: Could not create or open data file: %s\n", dataFiles[i]);
+        }
+    }
 }
 
 int generateReportId() {
@@ -33,7 +68,7 @@ int generateBillId() {
 }
 
 void saveReport(Report* report) {
-    createDataDirectory();
+    createReportsDirectory();
 
     FILE *fp = fopen(REPORT_DATAFILE, "a");
     if (!fp) {
@@ -54,7 +89,7 @@ void saveReport(Report* report) {
 }
 
 void saveBill(Bill* bill) {
-    createDataDirectory();
+    createReportsDirectory();
 
     FILE *fp = fopen(BILL_DATAFILE, "a");
     if (!fp) {
@@ -251,175 +286,136 @@ void generatePatientStatisticsReport() {
 
 void generateBillingReport() {
     int patientId;
-    printf("Enter Patient ID (0 for all patients): ");
-    scanf("%d", &patientId);
-    getchar();
+    char patientIdStr[12];
+    double totalBill = 0.0;
+    double appointmentCharges = 0.0;
+    double emergencyCharges = 0.0;
+    double medicineCharges = 0.0;
 
-    Report report = {0};
-    report.reportId = generateReportId();
-    report.type = BILLING_REPORT;
+    system("cls");
+    printf("==== Generate Billing Report ====\n\n");
+    printf("Enter Patient ID: ");
+    if (scanf("%d", &patientId) != 1) {
+        while (getchar() != '\n'); // Clear buffer
+        printf("Invalid input. Please enter a numeric ID.\n");
+        printf("\nPress Enter to return to menu...");
+        getchar();
+        return;
+    }
+    getchar(); // Consume newline
 
-    if (patientId == 0) {
-        strcpy(report.title, "All Bills Report");
-    } else {
-        sprintf(report.title, "Billing Report - Patient ID: %d", patientId);
+    sprintf(patientIdStr, "%d", patientId);
+    Patient patient = findPatientBySearch(1, patientIdStr, NULL);
+
+    if (patient.patientId == 0) {
+        printf("Patient with ID %d not found.\n", patientId);
+        printf("\nPress Enter to return to menu...");
+        getchar();
+        return;
     }
 
-    char content[4000] = "==== BILLING REPORT ====\n\n";
-    char line[300];
+    printf("\n--- Generating Report for Patient ---\n");
+    printf("ID:   %d\n", patient.patientId);
+    printf("Name: %s\n", patient.name);
+    printf("-------------------------------------\n\n");
+    printf("Itemized Bill:\n");
+    printf("--------------------------------------------------------------------------\n");
+    printf("%-30s %-20s %15s\n", "Description", "Date/Time", "Cost (BDT)");
+    printf("--------------------------------------------------------------------------\n");
 
-    // Try to read from bills file first
-    FILE *fp = fopen(BILL_DATAFILE, "r");
-
-    if (fp) {
-        float totalRevenue = 0.0;
-        int billCount = 0;
-        Bill bill;
-        while (fscanf(fp, "%d,%d,%f,%f,%f,%f,%f,%19[^,],%19[^,],%199[^\n]",
-                      &bill.billId, &bill.patientId, &bill.consultationFee, &bill.medicineTotal,
-                      &bill.tax, &bill.discount, &bill.grandTotal, bill.billDate,
-                      bill.paymentStatus, bill.notes) == 10) {
-
-            if (patientId == 0 || bill.patientId == patientId) {
-                sprintf(line, "Bill ID: %d | Patient ID: %d | Total: Tk.%.2f | Date: %s | Status: %s\n",
-                        bill.billId, bill.patientId, bill.grandTotal, bill.billDate, bill.paymentStatus);
-                strcat(content, line);
-                billCount++;
-                totalRevenue += bill.grandTotal;
+    // 1. Calculate Appointment Charges
+    FILE *appFp = fopen(APPOINTMENT_DATAFILE, "r");
+    if (appFp) {
+        char line[512];
+        while (fgets(line, sizeof(line), appFp)) {
+            int appId, appPatientId;
+            char doctorName[50], date[20], time[10];
+            if (sscanf(line, "%d,%d,%49[^,],%19[^,],%9[^,]", &appId, &appPatientId, doctorName, date, time) >= 5) {
+                if (appPatientId == patientId) {
+                    char description[100];
+                    snprintf(description, sizeof(description), "Appointment (Dr. %s)", doctorName);
+                    char dateTime[30];
+                    snprintf(dateTime, sizeof(dateTime), "%s %s", date, time);
+                    printf("%-30s %-20s %15.2f\n", description, dateTime, APPOINTMENT_FEE);
+                    appointmentCharges += APPOINTMENT_FEE;
+                }
             }
         }
-        fclose(fp);
-
-        if (billCount > 0) {
-            sprintf(line, "\nTotal Bills: %d\nTotal Revenue: Tk.%.2f\n\n", billCount, totalRevenue);
-            strcat(content, line);
-        }
+        fclose(appFp);
     }
 
-    // Generate from prescription data
-    strcat(content, "==== PRESCRIPTION COSTS ====\n");
-    FILE *prescFp = fopen("data/prescription.csv", "r");
-    float totalPrescriptionCost = 0.0;
-    int prescriptionCount = 0;
-
+    // 2. Calculate Prescription Medicine Charges
+    FILE *prescFp = fopen(PRESCRIPTION_DATAFILE, "r");
     if (prescFp) {
-        Prescription prescription;
-        while (fscanf(prescFp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%49[^,],%99[^,],%49[^,],%199[^\n]",
-                      &prescription.prescriptionId, &prescription.patientId, &prescription.medicineId,
-                      prescription.medicineName, &prescription.quantity, &prescription.unitPrice,
-                      &prescription.totalPrice, prescription.prescribedDate, prescription.prescribedBy,
-                      prescription.dosage, prescription.duration, prescription.notes) == 12) {
-
-            if (patientId == 0 || prescription.patientId == patientId) {
-                sprintf(line, "Prescription ID: %d | Patient ID: %d | Medicine: %s | Cost: Tk.%.2f | Date: %s\n",
-                        prescription.prescriptionId, prescription.patientId, prescription.medicineName,
-                        prescription.totalPrice, prescription.prescribedDate);
-                strcat(content, line);
-                totalPrescriptionCost += prescription.totalPrice;
-                prescriptionCount++;
+        Prescription p;
+        while (fscanf(prescFp, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%*s",
+                      &p.prescriptionId, &p.patientId, &p.medicineId, p.medicineName,
+                      &p.quantity, &p.unitPrice, &p.totalPrice, p.prescribedDate) == 8) {
+            if (p.patientId == patientId) {
+                char description[100];
+                snprintf(description, sizeof(description), "Prescription: %s (x%d)", p.medicineName, p.quantity);
+                printf("%-30s %-20s %15.2f\n", description, p.prescribedDate, p.totalPrice);
+                medicineCharges += p.totalPrice;
             }
+            // Skip rest of the line
+            int c;
+            while ((c = fgetc(prescFp)) != '\n' && c != EOF);
         }
         fclose(prescFp);
     }
 
-    // Add emergency medicine costs for discharged patients
-    strcat(content, "\n==== EMERGENCY MEDICINE COSTS ====\n");
-    FILE *emergencyFp = fopen("data/emergency_records.csv", "r");
-    float totalEmergencyCost = 0.0;
-    int emergencyCount = 0;
 
-    if (emergencyFp) {
-        char emergencyLine[500];
-        while (fgets(emergencyLine, sizeof(emergencyLine), emergencyFp)) {
-            int emergencyId, emergPatientId, priority;
-            char patientName[50], phoneNumber[20], symptoms[200], arrivalDate[20], arrivalTime[10];
-            char status[20], assignedDoctor[50], treatment[200], notes[200];
+    // 3. Calculate Emergency Visit and Medicine Charges
+    FILE *emergFp = fopen(EMERGENCY_DATAFILE, "r");
+    if (emergFp) {
+        char line[1024];
+        while (fgets(line, sizeof(line), emergFp)) {
+            int emergId, emergPatientId;
+            char arrivalDate[20];
+            if (sscanf(line, "%d,%d,%*[^,],%*[^,],%*[^,],%*[^,],%19[^,]", &emergId, &emergPatientId, arrivalDate) == 3) {
+                if (emergPatientId == patientId) {
+                    char description[100];
+                    snprintf(description, sizeof(description), "Emergency Visit (ID: %d)", emergId);
+                    printf("%-30s %-20s %15.2f\n", description, arrivalDate, EMERGENCY_BASE_FEE);
+                    emergencyCharges += EMERGENCY_BASE_FEE;
 
-            if (sscanf(emergencyLine, "%d,%d,%49[^,],%19[^,],%199[^,],%d,%19[^,],%9[^,],%19[^,],%49[^,],%199[^,],%199[^\n]",
-                      &emergencyId, &emergPatientId, patientName, phoneNumber, symptoms, &priority,
-                      arrivalDate, arrivalTime, status, assignedDoctor, treatment, notes) == 12) {
-
-                if ((patientId == 0 || emergPatientId == patientId) &&
-                    (strcmp(status, "Discharged") == 0 || strcmp(status, "Completed") == 0)) {
-
-                    // Calculate emergency treatment cost (base emergency fee + treatment cost)
-                    const float emergencyFee = 1000.0; // Base emergency treatment fee
-                    float treatmentCost = 0.0;
-
-                    // Parse treatment for medicine costs
-                    if (strstr(treatment, "Medicine") != NULL || strstr(treatment, "medication") != NULL ||
-                        strstr(treatment, "Paracetamol") != NULL || strstr(treatment, "Antibiotic") != NULL ||
-                        strstr(treatment, "injection") != NULL || strstr(treatment, "IV") != NULL) {
-                        treatmentCost = 500.0; // Default medicine cost for emergency treatment
+                    FILE *medFp = fopen(EMERGENCY_MEDICINES_FILE, "r");
+                    if (medFp) {
+                        char medLine[256];
+                        while (fgets(medLine, sizeof(medLine), medFp)) {
+                            int medEmergId, medId, medQty;
+                            if (sscanf(medLine, "%d,%d,%*[^,],%d", &medEmergId, &medId, &medQty) == 3) {
+                                if (medEmergId == emergId) {
+                                    Medicine medInfo = findMedicine(medId);
+                                    if (medInfo.medicineId != 0) {
+                                        double cost = medInfo.price * medQty;
+                                        char medDescription[100];
+                                        snprintf(medDescription, sizeof(medDescription), "  Medicine: %s (x%d)", medInfo.name, medQty);
+                                        printf("%-30s %-20s %15.2f\n", medDescription, arrivalDate, cost);
+                                        medicineCharges += cost;
+                                    }
+                                }
+                            }
+                        }
+                        fclose(medFp);
                     }
-
-                    const float totalEmergencyItemCost = emergencyFee + treatmentCost;
-
-                    sprintf(line, "Emergency ID: %d | Patient ID: %d | Treatment: %s | Cost: Tk.%.2f | Date: %s\n",
-                            emergencyId, emergPatientId, treatment, totalEmergencyItemCost, arrivalDate);
-                    strcat(content, line);
-
-                    // This is the key fix - properly accumulate the cost
-                    totalEmergencyCost += totalEmergencyItemCost;
-                    emergencyCount++;
                 }
             }
         }
-        fclose(emergencyFp);
-
-        if (emergencyCount == 0) {
-            strcat(content, "No emergency medicine costs found.\n");
-        } else {
-            sprintf(line, "\nTotal Emergency Records: %d\n", emergencyCount);
-            strcat(content, line);
-            sprintf(line, "Total Emergency Cost: Tk.%.2f\n", totalEmergencyCost);
-            strcat(content, line);
-        }
-    } else {
-        strcat(content, "No emergency data available.\n");
+        fclose(emergFp);
     }
 
-    // Calculate total costs
-    const int totalServices = prescriptionCount + emergencyCount;
-    if (totalServices > 0) {
-        sprintf(line, "\nTotal Prescriptions: %d\nTotal Emergency Treatments: %d\n",
-                prescriptionCount, emergencyCount);
-        strcat(content, line);
-        sprintf(line, "Total Prescription Cost: Tk.%.2f\nTotal Emergency Cost: Tk.%.2f\n",
-                totalPrescriptionCost, totalEmergencyCost);
-        strcat(content, line);
+    totalBill = appointmentCharges + emergencyCharges + medicineCharges;
 
-        // Calculate estimated billing with consultation fees and tax
-        const float consultationFees = prescriptionCount * 500.0; // 500 Tk per prescription
-        const float emergencyFees = emergencyCount * 200.0; // Additional 200 Tk per emergency consultation
-        const float subtotal = totalPrescriptionCost + totalEmergencyCost + consultationFees + emergencyFees;
-        const float tax = subtotal * 0.05; // 5% tax
-        const float grandTotal = subtotal + tax;
+    printf("--------------------------------------------------------------------------\n");
+    printf("%52s %15.2f\n", "Subtotal Appointments:", appointmentCharges);
+    printf("%52s %15.2f\n", "Subtotal Emergency Visits:", emergencyCharges);
+    printf("%52s %15.2f\n", "Subtotal Medicines:", medicineCharges);
+    printf("--------------------------------------------------------------------------\n");
+    printf("%52s Tk.%14.2f\n", "TOTAL DUE:", totalBill);
+    printf("--------------------------------------------------------------------------\n");
 
-        sprintf(line, "\n==== ESTIMATED BILLING SUMMARY ====\n");
-        strcat(content, line);
-        sprintf(line, "Prescription Medicine Costs: Tk.%.2f\n", totalPrescriptionCost);
-        strcat(content, line);
-        sprintf(line, "Emergency Medicine Costs: Tk.%.2f\n", totalEmergencyCost);
-        strcat(content, line);
-        sprintf(line, "Consultation Fees: Tk.%.2f\n", consultationFees);
-        strcat(content, line);
-        sprintf(line, "Emergency Consultation Fees: Tk.%.2f\n", emergencyFees);
-        strcat(content, line);
-        sprintf(line, "Tax (5%%): Tk.%.2f\n", tax);
-        strcat(content, line);
-        sprintf(line, "Estimated Grand Total: Tk.%.2f\n", grandTotal);
-        strcat(content, line);
-    } else {
-        strcat(content, "No prescription or emergency data found for billing.\n");
-    }
-
-    strcpy(report.content, content);
-    saveReport(&report);
-
-    printf("\n%s", content);
-    printf("\nReport saved with ID: %d\n", report.reportId);
-    printf("Press Enter to return to menu...");
+    printf("\nPress Enter to return to menu...");
     getchar();
 }
 
@@ -515,164 +511,248 @@ void deleteReport() {
     printf("Press Enter to return to menu...");
     getchar();
 }
+
+static void printPrescriptionHistory(int patientId, FILE* reportFp) {
+    fprintf(reportFp, "----------------------------------------\n");
+    fprintf(reportFp, "       PRESCRIPTION HISTORY\n");
+    fprintf(reportFp, "----------------------------------------\n\n");
+
+    FILE *prescFp = fopen(PRESCRIPTION_DATAFILE, "r");
+    if (!prescFp) {
+        fprintf(reportFp, "Could not open prescription data file.\n\n");
+        return;
+    }
+
+    char line[1024];
+    int prescriptionsFound = 0;
+    while (fgets(line, sizeof(line), prescFp)) {
+        int recordPatientId;
+        // Use sscanf to check the patient ID without modifying the line
+        if (sscanf(line, "%*d,%d,", &recordPatientId) == 1 && recordPatientId == patientId) {
+            prescriptionsFound = 1;
+            char *id = strtok(line, ",");
+            strtok(NULL, ","); // patientId
+            char *medId = strtok(NULL, ",");
+            char *medName = strtok(NULL, ",");
+            strtok(NULL, ","); // quantity
+            strtok(NULL, ","); // unitPrice
+            char *totalPrice = strtok(NULL, ",");
+            char *date = strtok(NULL, ",");
+            char *doctor = strtok(NULL, ",");
+            char *dosage = strtok(NULL, ",");
+            char *duration = strtok(NULL, ",");
+            char *notes = strtok(NULL, "\n");
+
+            fprintf(reportFp, "Prescription ID: %s (Medicine: %s)\n", id, medName);
+            fprintf(reportFp, "  Prescribed by: Dr. %s on %s\n", doctor, date);
+            fprintf(reportFp, "  Dosage: %s\n", dosage);
+            fprintf(reportFp, "  Duration: %s\n", duration);
+            fprintf(reportFp, "  Total Price: %.2f\n", atof(totalPrice));
+            fprintf(reportFp, "  Notes: %s\n\n", notes ? notes : "N/A");
+        }
+    }
+
+    if (!prescriptionsFound) {
+        fprintf(reportFp, "No prescription history found.\n\n");
+    }
+    fclose(prescFp);
+}
+
 void generatePatientProfileReport() {
     int patientId;
-    printf("Enter Patient ID: ");
-    scanf("%d", &patientId);
-    getchar();
+    printf("Enter Patient ID to generate report for: ");
+    if (scanf("%d", &patientId) != 1) {
+        while (getchar() != '\n'); // Clear buffer
+        printf("Invalid input.\nPress Enter to continue...");
+        getchar();
+        return;
+    }
+    getchar(); // Consume newline
 
-    char patientIdStr[10];
+    createReportsDirectory();
+
+    char patientIdStr[12];
     sprintf(patientIdStr, "%d", patientId);
-    Patient patient = findPatientBySearch(3, patientIdStr, NULL);
+    Patient patient = findPatientBySearch(1, patientIdStr, NULL);
 
     if (patient.patientId == 0) {
-        printf("Patient not found!\n");
-        printf("Press Enter to return to menu...");
+        printf("Patient with ID %d not found.\n", patientId);
+        printf("Press Enter to continue...");
         getchar();
         return;
     }
 
-    Report report = {0};
-    report.reportId = generateReportId();
-    report.type = PATIENT_PROFILE;
-    sprintf(report.title, "Patient Profile - %s (ID: %d)", patient.name, patient.patientId);
+    char filename[100];
+    sprintf(filename, "reports/Patient_Profile_%d_%s.txt", patient.patientId, patient.name);
 
-    char content[4000]; // Increased size for prescription data
-    sprintf(content,
-            "==== PATIENT PROFILE REPORT ====\n\n"
-            "Patient ID: %d\n"
-            "Name: %s\n"
-            "Age: %d\n"
-            "Gender: %s\n"
-            "Phone: %s\n"
-            "Address: %s\n"
-            "Email: %s\n"
-            "Blood Type: %s\n"
-            "Allergies: %s\n"
-            "Emergency Contact: %s\n"
-            "Primary Doctor: %s\n\n",
-            patient.patientId, patient.name, patient.age,
-            patient.gender == 'M' ? "Male" : "Female",
-            patient.phone, patient.address, patient.email,
-            patient.bloodType, patient.allergies,
-            patient.emergencyContact, patient.primaryDoctor);
-
-    // Add prescription information
-    strcat(content, "==== PRESCRIPTION HISTORY ====\n");
-
-    FILE *prescriptionFp = fopen(PRESCRIPTION_DATAFILE, "r");
-    if (prescriptionFp) {
-        char line[500];
-        int prescriptionCount = 0;
-
-        while (fgets(line, sizeof(line), prescriptionFp)) {
-            int prescId, prescPatientId, medicineId, quantity;
-            float unitPrice, totalPrice;
-            char medicineName[50], prescribedDate[20], prescribedBy[50], dosage[100], duration[50], notes[200];
-
-            if (sscanf(line, "%d,%d,%d,%49[^,],%d,%f,%f,%19[^,],%49[^,],%99[^,],%49[^,],%199[^\n]",
-                      &prescId, &prescPatientId, &medicineId, medicineName, &quantity, &unitPrice,
-                      &totalPrice, prescribedDate, prescribedBy, dosage, duration, notes) == 12) {
-
-                if (prescPatientId == patientId) {
-                    char prescLine[400];
-                    sprintf(prescLine, "Prescription ID: %d\n", prescId);
-                    strcat(content, prescLine);
-                    sprintf(prescLine, "Date: %s | Doctor: %s\n", prescribedDate, prescribedBy);
-                    strcat(content, prescLine);
-                    sprintf(prescLine, "Medicine: %s | Quantity: %d | Unit Price: Tk.%.2f\n",
-                            medicineName, quantity, unitPrice);
-                    strcat(content, prescLine);
-                    sprintf(prescLine, "Total: Tk.%.2f | Dosage: %s\n", totalPrice, dosage);
-                    strcat(content, prescLine);
-                    sprintf(prescLine, "Duration: %s | Notes: %s\n\n", duration, notes);
-                    strcat(content, prescLine);
-                    prescriptionCount++;
-                }
-            }
-        }
-        fclose(prescriptionFp);
-
-        if (prescriptionCount == 0) {
-            strcat(content, "No prescription history found.\n\n");
-        }
-    } else {
-        strcat(content, "No prescription data available.\n\n");
+    FILE *reportFp = fopen(filename, "w");
+    if (!reportFp) {
+        perror("Error creating report file");
+        printf("Press Enter to continue...");
+        getchar();
+        return;
     }
 
-    // Add emergency medicine history
-    strcat(content, "==== EMERGENCY MEDICINE HISTORY ====\n");
+    printf("Generating report for %s (ID: %d)...\n", patient.name, patient.patientId);
+
+    // --- Patient Demographics ---
+    fprintf(reportFp, "========================================\n");
+    fprintf(reportFp, "      PATIENT PROFILE REPORT\n");
+    fprintf(reportFp, "========================================\n\n");
+    fprintf(reportFp, "Patient ID: %d\n", patient.patientId);
+    fprintf(reportFp, "Name: %s\n", patient.name);
+    fprintf(reportFp, "Age: %d\n", patient.age);
+    fprintf(reportFp, "Gender: %c\n", patient.gender);
+    fprintf(reportFp, "Phone: %s\n", patient.phone);
+    fprintf(reportFp, "Address: %s\n", patient.address);
+    fprintf(reportFp, "Email: %s\n", patient.email);
+    fprintf(reportFp, "Emergency Contact: %s\n\n", patient.emergencyContact);
+
+    // --- Medical Information ---
+    fprintf(reportFp, "----------------------------------------\n");
+    fprintf(reportFp, "        MEDICAL INFORMATION\n");
+    fprintf(reportFp, "----------------------------------------\n\n");
+    fprintf(reportFp, "Blood Type: %s\n", patient.bloodType);
+    fprintf(reportFp, "Known Allergies: %s\n", patient.allergies);
+    fprintf(reportFp, "Primary Doctor: %s\n\n", patient.primaryDoctor);
+
+    // --- Prescription History ---
+    printPrescriptionHistory(patient.patientId, reportFp);
+
+    // --- Emergency Visit History ---
+    printEmergencyHistory(patient.patientId, reportFp);
+
+    // --- Appointment History ---
+    fprintf(reportFp, "----------------------------------------\n");
+    fprintf(reportFp, "        APPOINTMENT HISTORY\n");
+    fprintf(reportFp, "----------------------------------------\n\n");
+
+    FILE *appointmentFp = fopen(APPOINTMENT_DATAFILE, "r");
+    if (appointmentFp) {
+        char line[512];
+        int appointmentsFound = 0;
+        while (fgets(line, sizeof(line), appointmentFp)) {
+            int appPatientId;
+            if (sscanf(line, "%*d,%d,", &appPatientId) == 1 && appPatientId == patient.patientId) {
+                char *id = strtok(line, ",");
+                strtok(NULL, ","); // patientId
+                char *doctor = strtok(NULL, ",");
+                char *date = strtok(NULL, ",");
+                char *time = strtok(NULL, ",");
+                char *purpose = strtok(NULL, ",");
+                char *status = strtok(NULL, "\n");
+                fprintf(reportFp, "Appointment ID: %s\n", id);
+                fprintf(reportFp, "  Date: %s at %s\n", date, time);
+                fprintf(reportFp, "  Doctor: %s\n", doctor);
+                fprintf(reportFp, "  Purpose: %s\n", purpose);
+                fprintf(reportFp, "  Status: %s\n\n", status);
+                appointmentsFound = 1;
+            }
+        }
+        if (!appointmentsFound) {
+            fprintf(reportFp, "No appointment history found.\n\n");
+        }
+        fclose(appointmentFp);
+    } else {
+        fprintf(reportFp, "Could not open appointment data file.\n\n");
+    }
+
+    fprintf(reportFp, "========================================\n");
+    fprintf(reportFp, "           END OF REPORT\n");
+    fprintf(reportFp, "========================================\n");
+
+    fclose(reportFp);
+    printf("Report '%s' generated successfully.\n", filename);
+    printf("Press Enter to continue...");
+    getchar();
+}
+
+static void printEmergencyHistory(int patientId, FILE* reportFp) {
+    fprintf(reportFp, "----------------------------------------\n");
+    fprintf(reportFp, "       EMERGENCY VISIT HISTORY\n");
+    fprintf(reportFp, "----------------------------------------\n\n");
 
     FILE *emergencyFp = fopen(EMERGENCY_DATAFILE, "r");
-    if (emergencyFp) {
-        char line[500];
-        int emergencyCount = 0;
-
-        while (fgets(line, sizeof(line), emergencyFp)) {
-            int emergencyId, emergPatientId, priority;
-            char patientName[50], symptoms[200], arrivalDate[20], arrivalTime[10];
-            char status[20], assignedDoctor[50], treatment[200], notes[200];
-
-            // Parse the complete emergency record format
-            if (sscanf(line, "%d,%d,%49[^,],%*[^,],%199[^,],%d,%19[^,],%9[^,],%19[^,],%49[^,],%199[^,],%199[^\n]",
-                      &emergencyId, &emergPatientId, patientName, symptoms, &priority,
-                      arrivalDate, arrivalTime, status, assignedDoctor, treatment, notes) >= 10) {
-
-                if (emergPatientId == patientId) {
-                    char emergLine[400];
-                    sprintf(emergLine, "Emergency ID: %d\n", emergencyId);
-                    strcat(content, emergLine);
-                    sprintf(emergLine, "Date: %s | Time: %s\n", arrivalDate, arrivalTime);
-                    strcat(content, emergLine);
-                    sprintf(emergLine, "Priority: %d | Status: %s\n", priority, status);
-                    strcat(content, emergLine);
-                    sprintf(emergLine, "Symptoms: %s\n", symptoms);
-                    strcat(content, emergLine);
-                    sprintf(emergLine, "Doctor: %s\n", assignedDoctor);
-                    strcat(content, emergLine);
-                    sprintf(emergLine, "Treatment: %s\n", treatment);
-                    strcat(content, emergLine);
-                    sprintf(emergLine, "Notes: %s\n\n", notes);
-                    strcat(content, emergLine);
-                    emergencyCount++;
-                }
-            }
-        }
-        fclose(emergencyFp);
-
-        if (emergencyCount == 0) {
-            strcat(content, "No emergency treatment history found.\n\n");
-        } else {
-            char countLine[50];
-            sprintf(countLine, "Total Emergency Records: %d\n\n", emergencyCount);
-            strcat(content, countLine);
-        }
-    } else {
-        strcat(content, "No emergency data available.\n\n");
+    if (!emergencyFp) {
+        fprintf(reportFp, "No emergency records data file found.\n\n");
+        return;
     }
 
-    char reportDate[20];
-    time_t now;
-    time(&now);
-    const struct tm *timeinfo = localtime(&now);
-    strftime(reportDate, sizeof(reportDate), "%d/%m/%Y", timeinfo);
+    char line[1024];
+    int visitsFound = 0;
+    while (fgets(line, sizeof(line), emergencyFp)) {
+        int recordPatientId, emergencyId;
+        // Create a copy for sscanf to avoid modifying the original line
+        char lineCopyForSscanf[1024];
+        strcpy(lineCopyForSscanf, line);
 
-    char footerLine[100];
-    sprintf(footerLine, "Report generated on: %s\n", reportDate);
-    strcat(content, footerLine);
+        if (sscanf(lineCopyForSscanf, "%d,%d,", &emergencyId, &recordPatientId) == 2 && recordPatientId == patientId) {
+            visitsFound = 1;
+            char *fields[13] = {0};
+            // Create a copy for strtok to parse
+            char lineCopyForStrtok[1024];
+            strcpy(lineCopyForStrtok, line);
+            char *token = strtok(lineCopyForStrtok, ",\n");
+            int i = 0;
+            while(token != NULL && i < 13) {
+                fields[i++] = token;
+                token = strtok(NULL, ",\n");
+            }
 
-    strcpy(report.content, content);
-    strcpy(report.generatedDate, reportDate);
-    saveReport(&report);
+            fprintf(reportFp, "Emergency ID: %s\n", fields[0]);
+            fprintf(reportFp, "  Arrival: %s at %s\n", fields[6], fields[7]);
+            fprintf(reportFp, "  Symptoms: %s\n", fields[4]);
+            fprintf(reportFp, "  Doctor: %s\n", fields[9]);
+            fprintf(reportFp, "  Treatment: %s\n", fields[10]);
+            fprintf(reportFp, "  Status: %s\n", fields[8]);
+            fprintf(reportFp, "  Notes: %s\n", fields[12] ? fields[12] : "N/A");
 
-    printf("\n%s", content);
-    printf("\nReport saved with ID: %d\n", report.reportId);
-    printf("Press Enter to return to menu...");
-    getchar();
+            // Now find and print medicines for this emergency ID
+            FILE *medFp = fopen(EMERGENCY_MEDICINES_FILE, "r");
+            if (medFp) {
+                fprintf(reportFp, "  Medicines Prescribed:\n");
+                char medLine[512];
+                int medsFound = 0;
+                while (fgets(medLine, sizeof(medLine), medFp)) {
+                    int medEmergencyId;
+                    if (sscanf(medLine, "%d,", &medEmergencyId) == 1 && medEmergencyId == emergencyId) {
+                        char *medFields[6] = {0};
+                        // Create a copy for strtok
+                        char medLineCopy[512];
+                        strcpy(medLineCopy, medLine);
+                        char *medToken = strtok(medLineCopy, ",\n");
+                        int j = 0;
+                        while(medToken != NULL && j < 6) {
+                            medFields[j++] = medToken;
+                            medToken = strtok(NULL, ",\n");
+                        }
+                        // Format: EmergID,MedID,MedName,Qty,Dosage,Instructions
+                        fprintf(reportFp, "    - %s (ID: %s): Qty: %s, Dosage: %s, Instructions: %s\n",
+                                medFields[2], medFields[1], medFields[3], medFields[4], medFields[5] ? medFields[5] : "N/A");
+                        medsFound = 1;
+                    }
+                }
+                if (!medsFound) {
+                    fprintf(reportFp, "    - None\n");
+                }
+                fclose(medFp);
+            } else {
+                fprintf(reportFp, "    - (Could not open medicine data file)\n");
+            }
+            fprintf(reportFp, "\n");
+        }
+    }
+
+    if (!visitsFound) {
+        fprintf(reportFp, "No emergency visit history found.\n\n");
+    }
+    fclose(emergencyFp);
 }
 
 void reportManagement() {
     int choice;
+    initializeDataFiles(); // Ensure all data files exist
+
 
     while (1) {
         system("cls");
